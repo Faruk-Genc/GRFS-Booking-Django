@@ -1,8 +1,21 @@
 from django.db import models
-from django.contrib.auth.models import User
+from django.contrib.auth.models import AbstractUser
+from django.contrib.auth import get_user_model
 from datetime import datetime
 
-# Create your models here.
+class CustomUser(AbstractUser):
+    ROLE_CHOICES = [
+        ('user', 'User'),
+        ('mentor', 'Mentor'),
+        ('coordinator', 'Coordinator'),
+        ('admin', 'Admin'),
+    ]
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='user')
+
+    def __str__(self):
+        return f"{self.username} ({self.role})"
+
+
 class Floor(models.Model):
     name = models.CharField(max_length=100)
 
@@ -16,12 +29,15 @@ class Room(models.Model):
 
     def __str__(self):
         return f"{self.name} (Floor {self.floor.name})"
-    
+
+
+User = get_user_model()
+
 class Booking(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="bookings")
     rooms = models.ManyToManyField("Room", related_name="bookings")
-    start_datetime = models.DateTimeField(null=True, blank=True)
-    end_datetime = models.DateTimeField(null=True, blank=True)
+    start_datetime = models.DateTimeField(null=True, blank=True, db_index=True)
+    end_datetime = models.DateTimeField(null=True, blank=True, db_index=True)
     status = models.CharField(
         max_length=20,
         choices=[
@@ -33,8 +49,8 @@ class Booking(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True)
 
-    def __str__(self):
-        return f"Booking by {self.user.username} from {self.start_datetime} to {self.end_datetime}"
-
     class Meta:
         ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Booking by {self.user.username} from {self.start_datetime} to {self.end_datetime}"
