@@ -51,11 +51,16 @@ class Booking(models.Model):
             ("Cancelled", "Cancelled"),
         ],
         default="Pending",
+        db_index=True,  # Add index for faster filtering
     )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=['status', 'start_datetime']),
+            models.Index(fields=['user', 'status']),
+        ]
 
     def __str__(self):
         return f"Booking by {self.user.username} from {self.start_datetime} to {self.end_datetime}"

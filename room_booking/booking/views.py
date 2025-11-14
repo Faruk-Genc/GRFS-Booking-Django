@@ -23,9 +23,18 @@ def check_booking_conflicts(room_ids, start_datetime, end_datetime, exclude_book
     Returns a list of conflicting bookings with details.
     """
     try:
-        start_dt = datetime.fromisoformat(start_datetime.replace('Z', '+00:00')) if isinstance(start_datetime, str) else start_datetime
-        end_dt = datetime.fromisoformat(end_datetime.replace('Z', '+00:00')) if isinstance(end_datetime, str) else end_datetime
-    except:
+        if isinstance(start_datetime, str):
+            start_dt = datetime.fromisoformat(start_datetime.replace('Z', '+00:00'))
+        else:
+            start_dt = start_datetime
+        if isinstance(end_datetime, str):
+            end_dt = datetime.fromisoformat(end_datetime.replace('Z', '+00:00'))
+        else:
+            end_dt = end_datetime
+    except (ValueError, AttributeError) as e:
+        # If parsing fails and it's not already a datetime, raise error
+        if not isinstance(start_datetime, datetime) or not isinstance(end_datetime, datetime):
+            raise ValueError(f"Invalid datetime format: {str(e)}")
         start_dt = start_datetime
         end_dt = end_datetime
     
@@ -111,22 +120,35 @@ class CreateBookingView(APIView):
                 start_dt_naive = datetime.strptime(start_datetime_str, '%Y-%m-%dT%H:%M:%S')
                 end_dt_naive = datetime.strptime(end_datetime_str, '%Y-%m-%dT%H:%M:%S')
                 
-                # Localize to EST
-                start_datetime = est.localize(start_dt_naive)
-                end_datetime = est.localize(end_dt_naive)
+                # Localize to EST using make_aware for better DST handling
+                start_datetime = timezone.make_aware(start_dt_naive, est)
+                end_datetime = timezone.make_aware(end_dt_naive, est)
             except ValueError:
                 # Try parsing with timezone if provided
                 try:
                     start_datetime = datetime.fromisoformat(start_datetime_str.replace('Z', '+00:00'))
                     end_datetime = datetime.fromisoformat(end_datetime_str.replace('Z', '+00:00'))
                     # Convert to EST
-                    start_datetime = start_datetime.astimezone(est)
-                    end_datetime = end_datetime.astimezone(est)
-                except:
+                    if start_datetime.tzinfo is None:
+                        start_datetime = timezone.make_aware(start_datetime, est)
+                    else:
+                        start_datetime = start_datetime.astimezone(est)
+                    if end_datetime.tzinfo is None:
+                        end_datetime = timezone.make_aware(end_datetime, est)
+                    else:
+                        end_datetime = end_datetime.astimezone(est)
+                except (ValueError, AttributeError) as e:
                     return Response(
-                        {"detail": "Invalid datetime format. Use YYYY-MM-DDTHH:MM:SS"}, 
+                        {"detail": f"Invalid datetime format. Use YYYY-MM-DDTHH:MM:SS. Error: {str(e)}"}, 
                         status=status.HTTP_400_BAD_REQUEST
                     )
+            
+            # Validate that end time is after start time
+            if end_datetime <= start_datetime:
+                return Response(
+                    {"detail": "End datetime must be after start datetime."}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
             # Check for booking conflicts
             conflicts = check_booking_conflicts(room_ids, start_datetime, end_datetime)
@@ -348,6 +370,9 @@ class CheckAvailabilityView(APIView):
             unavailable_slots = []
             bookings_list = []
             
+            # Prefetch rooms to avoid N+1 queries
+            bookings = bookings.prefetch_related('rooms')
+            
             # Collect all bookings with their room information
             for booking in bookings:
                 if booking.start_datetime and booking.end_datetime:
@@ -357,15 +382,17 @@ class CheckAvailabilityView(APIView):
                     
                     # Only include if booking is on the selected date
                     if start_est.date() == check_date or end_est.date() == check_date:
-                        for room in booking.rooms.filter(id__in=room_ids):
-                            bookings_list.append({
-                                'room_id': room.id,
-                                'room_name': room.name,
-                                'start_datetime': booking.start_datetime,
-                                'end_datetime': booking.end_datetime,
-                                'start_est': start_est,
-                                'end_est': end_est,
-                            })
+                        # Use prefetched rooms instead of querying
+                        for room in booking.rooms.all():
+                            if room.id in room_ids:
+                                bookings_list.append({
+                                    'room_id': room.id,
+                                    'room_name': room.name,
+                                    'start_datetime': booking.start_datetime,
+                                    'end_datetime': booking.end_datetime,
+                                    'start_est': start_est,
+                                    'end_est': end_est,
+                                })
             
             # Remove duplicates and format for response
             seen_bookings = set()

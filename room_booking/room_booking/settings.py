@@ -88,7 +88,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': os.getenv('DB_NAME', 'room_booking'),
         'USER': os.getenv('DB_USER', 'room_admin'),
-        'PASSWORD': os.getenv('DB_PASSWORD', 'fegwasd20061'),
+        'PASSWORD': os.getenv('DB_PASSWORD'),  # Must be set in environment
         'HOST': os.getenv('DB_HOST', 'localhost'),
         'PORT': os.getenv('DB_PORT', '5432'),
     }

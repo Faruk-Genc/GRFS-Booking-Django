@@ -18,16 +18,13 @@ const handleSubmit = async (e) => {
     password: password,
   };
 
-  console.log("Sending data to backend:", dataToSend);  // Log the request data for debugging
-
   try {
-    const res = await loginUser(dataToSend);  // Send the data to the backend
-    console.log("Backend response:", res.data);  // Log the successful response
+    const res = await loginUser(dataToSend);
     localStorage.setItem('access', res.data.access);
     localStorage.setItem('refresh', res.data.refresh);
     navigate('/bookingpage');
   } catch (err) {
-    console.error("Login error:", err.response?.data || err.message);  // Log error details
+    // Only show generic error to user, don't expose internal details
     setError('Invalid credentials. Please try again.');
   }
 };

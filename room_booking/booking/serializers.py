@@ -12,12 +12,13 @@ class UserSerializer(serializers.ModelSerializer):
         fields = ['id', 'username', 'email', 'first_name', 'last_name', 'role', 'password']
 
     def create(self, validated_data):
+        # Force role to 'user' during registration - only admins can change roles
         user = User(
             username=validated_data['username'],
             email=validated_data.get('email', ''),
             first_name=validated_data.get('first_name', ''),
             last_name=validated_data.get('last_name', ''),
-            role=validated_data.get('role', 'user')
+            role='user'  # Always set to 'user' on registration for security
         )
 
         user.set_password(validated_data['password'])
