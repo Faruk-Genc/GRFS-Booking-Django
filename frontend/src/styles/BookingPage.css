@@ -1,7 +1,7 @@
 /* General Styles */
 body {
   font-family: Arial, sans-serif;
-  background-color: #f4f7f6;
+  background-color: #f6f6f2;
   color: #333;
   margin: 0;
   padding: 0;
@@ -80,7 +80,7 @@ h2 {
 
 /* Add a color for each floor header */
 .floor-header:nth-child(1) {
-  background-color: #16a085; /* Green */
+  background-color: #6fb3b8; /* Green */
 }
 
 .floor-header:nth-child(2) {
@@ -115,8 +115,8 @@ h2 {
 
 /* Book Entire Floor Button */
 .book-floor-btn {
-  background-color: #3498db;
-  color: white;
+  background-color: #c2edce;
+  color: #388087;
   padding: 10px 20px;
   border: none;
   border-radius: 5px;

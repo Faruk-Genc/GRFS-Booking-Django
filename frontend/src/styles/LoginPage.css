@@ -25,13 +25,13 @@
   
   .login-container input:focus {
     outline: none;
-    border-color: #4CAF50;
+    border-color: #70bd85;
     box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
   }
   .login-container button {
     width: 100%;
     padding: 12px;
-    background-color: #4CAF50;
+    background-color: #70bd85;
     color: white;
     border: none;
     border-radius: 4px;
@@ -39,7 +39,7 @@
     cursor: pointer;
   }
   .login-container button:hover {
-    background-color: #45a049;
+    background-color: #437e51;
   }
   .error-message {
     color: red;
@@ -63,13 +63,13 @@
   }
   
   .auth-link a {
-    color: #4CAF50;
+    color: #70bd85;
     text-decoration: none;
     font-weight: 600;
     transition: color 0.3s ease;
   }
   
   .auth-link a:hover {
-    color: #45a049;
+    color: #70bd85;
     text-decoration: underline;
   }

@@ -336,12 +336,18 @@ const Dashboard = () => {
                 ) : (
                   <div className="booking-card-content">
                     <div className="booking-info">
-                      <div className="booking-header-compact">
+                    <div className="booking-top-row">
+                      <div className="left-side">
                         <h3>{booking.rooms.map(r => r.name).join(', ')}</h3>
                         <span className={`status-badge status-${booking.status.toLowerCase()}`}>
                           {booking.status}
                         </span>
                       </div>
+                      <div className="right-side">
+                        <button onClick={() => handleEdit(booking)} className="btn-edit">Edit</button>
+                        <button onClick={() => handleDelete(booking.id)} className="btn-delete">Cancel</button>
+                      </div>
+                    </div>
                       <div className="booking-details-compact">
                         <div className="detail-item-compact">
                           <strong>Date:</strong>
@@ -357,10 +363,7 @@ const Dashboard = () => {
                         </div>
                       </div>
                     </div>
-                    <div className="booking-actions-compact">
-                      <button onClick={() => handleEdit(booking)} className="btn-edit">Edit</button>
-                      <button onClick={() => handleDelete(booking.id)} className="btn-delete">Cancel</button>
-                    </div>
+                    
                   </div>
                 )}
               </div>

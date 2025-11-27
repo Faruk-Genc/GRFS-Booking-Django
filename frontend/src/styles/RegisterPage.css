@@ -51,7 +51,7 @@
   .register-container button {
     width: 100%;
     padding: 12px;
-    background-color: #4CAF50;
+    background-color: #70bd85;
     color: white;
     border: none;
     border-radius: 4px;
@@ -59,7 +59,7 @@
     cursor: pointer;
   }
   .register-container button:hover {
-    background-color: #45a049;
+    background-color: #437e51;
   }
   .success-message {
     color: green;
@@ -83,13 +83,13 @@
   }
   
   .auth-link a {
-    color: #4CAF50;
+    color: #70bd85;
     text-decoration: none;
     font-weight: 600;
     transition: color 0.3s ease;
   }
   
   .auth-link a:hover {
-    color: #45a049;
+    color: #70bd85;
     text-decoration: underline;
   }

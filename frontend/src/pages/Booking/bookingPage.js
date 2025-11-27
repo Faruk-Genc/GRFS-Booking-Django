@@ -117,7 +117,7 @@ const BookingPage = () => {
           <div key={floor.id} className="floor">
             <div
               className="floor-header"
-              style={{ backgroundColor: '#16a085' }}
+              
               onClick={(e) => toggleFloor(floor.id, e)} // Pass the event to prevent collapsing
             >
               <h3>{floor.name}</h3>
