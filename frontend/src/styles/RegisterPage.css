@@ -1,7 +1,8 @@
 .register-container {
-    width: 300px;
+    width: 400px;
+    max-width: 90%;
     margin: 100px auto;
-    padding: 20px;
+    padding: 30px;
     border-radius: 8px;
     background-color: #f4f4f4;
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
@@ -16,6 +17,15 @@
     margin: 10px 0;
     border-radius: 4px;
     border: 1px solid #ccc;
+    box-sizing: border-box;
+    font-size: 16px;
+    font-family: inherit;
+  }
+  
+  .register-container input:focus {
+    outline: none;
+    border-color: #4CAF50;
+    box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
   }
   .register-container button {
     width: 100%;
@@ -33,4 +43,32 @@
   .success-message {
     color: green;
     text-align: center;
+    margin-top: 15px;
+    padding: 10px;
+    background-color: #e8f5e9;
+    border-radius: 4px;
+  }
+  
+  .register-container form {
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .auth-link {
+    text-align: center;
+    margin-top: 20px;
+    color: #666;
+    font-size: 14px;
+  }
+  
+  .auth-link a {
+    color: #4CAF50;
+    text-decoration: none;
+    font-weight: 600;
+    transition: color 0.3s ease;
+  }
+  
+  .auth-link a:hover {
+    color: #45a049;
+    text-decoration: underline;
   }

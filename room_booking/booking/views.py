@@ -120,12 +120,25 @@ class CreateBookingView(APIView):
             est = pytz.timezone('America/New_York')
             try:
                 # Parse the datetime string (format: YYYY-MM-DDTHH:MM:SS)
+                # The frontend sends times in EST/EDT, so we treat them as such
                 start_dt_naive = datetime.strptime(start_datetime_str, '%Y-%m-%dT%H:%M:%S')
                 end_dt_naive = datetime.strptime(end_datetime_str, '%Y-%m-%dT%H:%M:%S')
                 
-                # Localize to EST using make_aware for better DST handling
-                start_datetime = timezone.make_aware(start_dt_naive, est)
-                end_datetime = timezone.make_aware(end_dt_naive, est)
+                # Use localize() to treat naive datetime as being in EST timezone
+                # This preserves the exact time the user selected
+                # is_dst=None raises error on ambiguous times (DST transitions)
+                # which is safer than guessing
+                try:
+                    start_datetime = est.localize(start_dt_naive, is_dst=None)
+                    end_datetime = est.localize(end_dt_naive, is_dst=None)
+                except pytz.AmbiguousTimeError:
+                    # If ambiguous (DST transition), use the later occurrence (DST=True)
+                    start_datetime = est.localize(start_dt_naive, is_dst=True)
+                    end_datetime = est.localize(end_dt_naive, is_dst=True)
+                except pytz.NonExistentTimeError:
+                    # If time doesn't exist (spring forward), use the next valid time
+                    start_datetime = est.localize(start_dt_naive, is_dst=False)
+                    end_datetime = est.localize(end_dt_naive, is_dst=False)
             except ValueError:
                 # Try parsing with timezone if provided
                 try:

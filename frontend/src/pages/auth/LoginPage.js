@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { loginUser } from '../../services/api';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import '../../styles/LoginPage.css';
 
 const LoginPage = () => {
@@ -50,6 +50,9 @@ const handleSubmit = async (e) => {
         <button type="submit">Login</button>
         {error && <p className="error-message">{error}</p>}
       </form>
+      <p className="auth-link">
+        Don't have an account? <Link to="/register">Register here</Link>
+      </p>
     </div>
   );
 };

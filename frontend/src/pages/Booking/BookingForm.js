@@ -58,8 +58,12 @@ const BookingForm = () => {
 
   // Format hour
   const formatHour = (hour) => {
+    // Handle hour 24 (midnight/12am)
+    if (hour === 24 || hour === 0) {
+      return '12:00 AM';
+    }
     const period = hour >= 12 ? 'PM' : 'AM';
-    const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
+    const displayHour = hour > 12 ? hour - 12 : hour;
     return `${displayHour}:00 ${period}`;
   };
 
@@ -77,6 +81,27 @@ const BookingForm = () => {
     setStartTime('');
     setEndTime('');
     setConflictDetails(null);
+  };
+
+  const handleDateInputClick = (e) => {
+    // Focus the input to open the calendar
+    e.target.focus();
+    // Try to show the native picker if available (only works on non-readonly inputs)
+    if (e.target.showPicker && !e.target.readOnly) {
+      try {
+        e.target.showPicker();
+      } catch (err) {
+        // If showPicker fails, focus is enough to open calendar in most browsers
+        console.log('showPicker not available, using focus');
+      }
+    }
+  };
+
+  const handleDateKeyDown = (e) => {
+    // Prevent typing - only allow navigation keys
+    if (!['Tab', 'Enter', 'Escape', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
+      e.preventDefault();
+    }
   };
 
   const handleStartTimeChange = (e) => {
@@ -111,8 +136,21 @@ const BookingForm = () => {
     try {
       // Create datetime strings - backend will interpret in EST/EDT timezone
       // Format: YYYY-MM-DDTHH:MM:SS (no timezone, Django will use TIME_ZONE setting)
-      const startDatetime = `${selectedDate}T${String(parseInt(startTime)).padStart(2, '0')}:00:00`;
-      const endDatetime = `${selectedDate}T${String(parseInt(endTime)).padStart(2, '0')}:00:00`;
+      let startHour = parseInt(startTime);
+      let endHour = parseInt(endTime);
+      
+      // Handle hour 24 (midnight) - convert to next day at 00:00
+      let endDate = selectedDate;
+      if (endHour === 24) {
+        endHour = 0;
+        // Add one day to the date
+        const date = new Date(selectedDate);
+        date.setDate(date.getDate() + 1);
+        endDate = date.toISOString().split('T')[0];
+      }
+      
+      const startDatetime = `${selectedDate}T${String(startHour).padStart(2, '0')}:00:00`;
+      const endDatetime = `${endDate}T${String(endHour).padStart(2, '0')}:00:00`;
 
       const response = await createBooking({
         room_ids: roomIds,
@@ -181,8 +219,8 @@ const BookingForm = () => {
     }
     
     // Generate options from startHour + 1 to maxEndHour (inclusive)
-    // Cap at 23 (11 PM) since we can't go past midnight in the same day
-    const actualMaxHour = Math.min(maxEndHour, 23);
+    // Allow up to 24 (12:00 AM) as end time
+    const actualMaxHour = Math.min(maxEndHour, 24);
     
     for (let hour = startHour + 1; hour <= actualMaxHour; hour++) {
       options.push({
@@ -219,9 +257,12 @@ const BookingForm = () => {
               id="date"
               value={selectedDate}
               onChange={handleDateChange}
+              onKeyDown={handleDateKeyDown}
+              onKeyPress={(e) => e.preventDefault()}
               min={today}
               required
-              className="form-input"
+              className="form-input date-input"
+              onClick={handleDateInputClick}
             />
           </div>
 
@@ -249,11 +290,22 @@ const BookingForm = () => {
             <div className="unavailable-info">
               <h4>Unavailable Time Slots:</h4>
               <ul>
-                {unavailableSlots.map((slot, idx) => (
-                  <li key={idx}>
-                    <strong>{slot.room_name}</strong>: {formatTimeString(slot.start_time)} - {formatTimeString(slot.end_time)}
-                  </li>
-                ))}
+                {[...unavailableSlots]
+                  .sort((a, b) => {
+                    // Sort by start_hour if available, otherwise by start_datetime
+                    if (a.start_hour !== undefined && b.start_hour !== undefined) {
+                      return a.start_hour - b.start_hour;
+                    }
+                    // Fallback to datetime string comparison
+                    const aTime = a.start_datetime || a.start_time || '';
+                    const bTime = b.start_datetime || b.start_time || '';
+                    return aTime.localeCompare(bTime);
+                  })
+                  .map((slot, idx) => (
+                    <li key={idx}>
+                      <strong>{slot.room_name}</strong>: {formatTimeString(slot.start_time)} - {formatTimeString(slot.end_time)}
+                    </li>
+                  ))}
               </ul>
             </div>
           )}

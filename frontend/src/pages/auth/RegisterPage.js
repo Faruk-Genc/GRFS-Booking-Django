@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { registerUser } from '../../services/api';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import '../../styles/RegisterPage.css';
 
 const RegisterPage = () => {
@@ -87,6 +87,9 @@ const RegisterPage = () => {
         <button type="submit">Register</button>
       </form>
       {message && <p className="success-message">{message}</p>}
+      <p className="auth-link">
+        Already have an account? <Link to="/login">Login here</Link>
+      </p>
     </div>
   );
 };

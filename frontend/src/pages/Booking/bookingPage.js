@@ -31,16 +31,19 @@ const BookingPage = () => {
 
   const fetchRooms = async (floorId) => {
     // If rooms are already fetched for this floor, no need to fetch again
-    if (fetchedRooms[floorId]) return;
+    if (fetchedRooms[floorId]) return fetchedRooms[floorId];
 
     try {
       const response = await getRooms(floorId);
+      const rooms = response.data;
       setFetchedRooms((prevRooms) => ({
         ...prevRooms,
-        [floorId]: response.data, // Cache rooms for the selected floor
+        [floorId]: rooms, // Cache rooms for the selected floor
       }));
+      return rooms;
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to fetch rooms');
+      return null;
     }
   };
 
@@ -69,11 +72,23 @@ const BookingPage = () => {
     }
   };
 
-  const handleFloorBooking = (floorId) => {
-    // Select all rooms for the floor when the "Book Entire Floor" button is clicked
-    const roomsForFloor = fetchedRooms[floorId].map((room) => room.id);
-    setSelectedRooms((prev) => [...prev, ...roomsForFloor]);
-    setSelectedFloors((prev) => [...prev, floorId]); // Add the floor to the selected list
+  const handleFloorBooking = async (floorId) => {
+    // Ensure rooms are fetched before trying to select them
+    let rooms = fetchedRooms[floorId];
+    
+    if (!rooms || !Array.isArray(rooms)) {
+      // Fetch rooms for this floor first if not already fetched
+      rooms = await fetchRooms(floorId);
+    }
+    
+    // Only proceed if we have valid rooms
+    if (rooms && Array.isArray(rooms) && rooms.length > 0) {
+      const roomsForFloor = rooms.map((room) => room.id);
+      setSelectedRooms((prev) => [...prev, ...roomsForFloor]);
+      setSelectedFloors((prev) => [...prev, floorId]);
+    } else {
+      setError('Unable to fetch rooms for this floor. Please try again.');
+    }
   };
 
   const handleSubmit = () => {
