@@ -370,11 +370,159 @@ class MyBookingView(APIView):
             )
         except Exception as e:
             # Log the full error for debugging but return generic message
-            import logging
-            logger = logging.getLogger(__name__)
             logger.error(f"Error fetching user bookings: {str(e)}", exc_info=True)
             return Response(
                 {"detail": "An error occurred while fetching your bookings. Please try again later."}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+class BookingDetailView(APIView):
+    """View to retrieve, update, or delete a specific booking"""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get_object(self, booking_id, user):
+        """Get booking object and verify ownership"""
+        try:
+            booking = Booking.objects.select_related('user').prefetch_related('rooms', 'rooms__floor').get(id=booking_id)
+            # Only allow users to access their own bookings (unless admin)
+            if booking.user != user and user.role != 'admin':
+                return None
+            return booking
+        except Booking.DoesNotExist:
+            return None
+    
+    def get(self, request, booking_id):
+        """Get a specific booking"""
+        try:
+            booking = self.get_object(booking_id, request.user)
+            if not booking:
+                return Response(
+                    {"detail": "Booking not found or you don't have permission to view it."}, 
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            serializer = BookingSerializer(booking)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except Exception as e:
+            logger.error(f"Error fetching booking: {str(e)}", exc_info=True)
+            return Response(
+                {"detail": "An error occurred while fetching the booking."}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    def put(self, request, booking_id):
+        """Update a booking"""
+        try:
+            booking = self.get_object(booking_id, request.user)
+            if not booking:
+                return Response(
+                    {"detail": "Booking not found or you don't have permission to edit it."}, 
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            
+            # Don't allow editing cancelled bookings
+            if booking.status == 'Cancelled':
+                return Response(
+                    {"detail": "Cannot edit a cancelled booking."}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Parse datetime if provided
+            est = pytz.timezone('America/New_York')
+            data = request.data.copy()
+            
+            if 'start_datetime' in data and isinstance(data['start_datetime'], str):
+                try:
+                    # Try parsing with datetime-local format (YYYY-MM-DDTHH:MM)
+                    if 'T' in data['start_datetime'] and len(data['start_datetime']) == 16:
+                        start_dt_naive = datetime.strptime(data['start_datetime'], '%Y-%m-%dT%H:%M')
+                    else:
+                        start_dt_naive = datetime.strptime(data['start_datetime'], '%Y-%m-%dT%H:%M:%S')
+                    try:
+                        data['start_datetime'] = est.localize(start_dt_naive, is_dst=None)
+                    except (pytz.AmbiguousTimeError, pytz.NonExistentTimeError):
+                        try:
+                            data['start_datetime'] = est.localize(start_dt_naive, is_dst=True)
+                        except:
+                            data['start_datetime'] = est.localize(start_dt_naive, is_dst=False)
+                except ValueError:
+                    pass  # Keep original value if parsing fails
+            
+            if 'end_datetime' in data and isinstance(data['end_datetime'], str):
+                try:
+                    # Try parsing with datetime-local format (YYYY-MM-DDTHH:MM)
+                    if 'T' in data['end_datetime'] and len(data['end_datetime']) == 16:
+                        end_dt_naive = datetime.strptime(data['end_datetime'], '%Y-%m-%dT%H:%M')
+                    else:
+                        end_dt_naive = datetime.strptime(data['end_datetime'], '%Y-%m-%dT%H:%M:%S')
+                    try:
+                        data['end_datetime'] = est.localize(end_dt_naive, is_dst=None)
+                    except (pytz.AmbiguousTimeError, pytz.NonExistentTimeError):
+                        try:
+                            data['end_datetime'] = est.localize(end_dt_naive, is_dst=True)
+                        except:
+                            data['end_datetime'] = est.localize(end_dt_naive, is_dst=False)
+                except ValueError:
+                    pass  # Keep original value if parsing fails
+            
+            # Check for conflicts (excluding current booking)
+            if 'room_ids' in data and 'start_datetime' in data and 'end_datetime' in data:
+                room_ids = data.get('room_ids', [])
+                start_dt = data.get('start_datetime')
+                end_dt = data.get('end_datetime')
+                
+                if isinstance(start_dt, str):
+                    start_dt = datetime.fromisoformat(start_dt.replace('Z', '+00:00'))
+                if isinstance(end_dt, str):
+                    end_dt = datetime.fromisoformat(end_dt.replace('Z', '+00:00'))
+                
+                conflicts = check_booking_conflicts(room_ids, start_dt, end_dt, exclude_booking_id=booking_id)
+                if conflicts:
+                    return Response(
+                        {"detail": "The updated booking conflicts with existing bookings.", "conflicts": conflicts}, 
+                        status=status.HTTP_409_CONFLICT
+                    )
+            
+            serializer = BookingSerializer(booking, data=data, partial=True, context={'request': request})
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data, status=status.HTTP_200_OK)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            
+        except (ValueError, TypeError, AttributeError) as e:
+            return Response(
+                {"detail": f"Invalid input: {str(e)}"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            logger.error(f"Error updating booking: {str(e)}", exc_info=True)
+            return Response(
+                {"detail": "An error occurred while updating the booking."}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    def delete(self, request, booking_id):
+        """Delete (cancel) a booking"""
+        try:
+            booking = self.get_object(booking_id, request.user)
+            if not booking:
+                return Response(
+                    {"detail": "Booking not found or you don't have permission to delete it."}, 
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            
+            # Instead of deleting, mark as cancelled
+            booking.status = 'Cancelled'
+            booking.save()
+            
+            return Response(
+                {"detail": "Booking cancelled successfully."}, 
+                status=status.HTTP_200_OK
+            )
+            
+        except Exception as e:
+            logger.error(f"Error cancelling booking: {str(e)}", exc_info=True)
+            return Response(
+                {"detail": "An error occurred while cancelling the booking."}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
     

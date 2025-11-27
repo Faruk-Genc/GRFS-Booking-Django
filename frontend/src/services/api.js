@@ -77,3 +77,19 @@ export const getRooms = async (floorId = null) => {
   const url = floorId ? `rooms/?floor=${floorId}` : 'rooms/';
   return await API.get(url);
 };
+
+export const getMyBookings = async () => {
+  return await API.get('bookings/my');
+};
+
+export const getBooking = async (bookingId) => {
+  return await API.get(`bookings/${bookingId}/`);
+};
+
+export const updateBooking = async (bookingId, data) => {
+  return await API.put(`bookings/${bookingId}/`, data);
+};
+
+export const deleteBooking = async (bookingId) => {
+  return await API.delete(`bookings/${bookingId}/`);
+};

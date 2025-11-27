@@ -67,17 +67,26 @@ class BookingSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
     rooms = RoomSerializer(many=True, read_only=True)
     room_ids = serializers.PrimaryKeyRelatedField(
-        queryset=Room.objects.all(), many=True, write_only=True, source='rooms', required=True
+        queryset=Room.objects.all(), many=True, write_only=True, source='rooms', required=False
     )
 
     class Meta:
         model = Booking
         fields = ['id', 'user', 'rooms', 'room_ids', 'start_datetime', 'end_datetime', 'status', 'created_at']
         read_only_fields = ['status', 'user', 'created_at']  # Status and user cannot be set via API
+    
+    def update(self, instance, validated_data):
+        """Update booking instance"""
+        # Don't allow changing user
+        validated_data.pop('user', None)
+        # Don't allow changing status directly (use cancel endpoint)
+        validated_data.pop('status', None)
+        return super().update(instance, validated_data)
 
     def validate_room_ids(self, value):
         """Validate that at least one room is selected"""
-        if not value or len(value) == 0:
+        # Only validate if value is provided (for updates, room_ids might not be included)
+        if value is not None and (not value or len(value) == 0):
             raise serializers.ValidationError("At least one room must be selected.")
         return value
 
