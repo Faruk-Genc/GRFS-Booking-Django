@@ -62,25 +62,25 @@ A full-stack room booking system built with Django REST Framework backend and Re
 
 4. **Set up environment variables**
    
-   Create a `.env` file in the `room_booking` directory:
-   ```env
-   # Django Settings
-   SECRET_KEY=your-secret-key-here
-   DEBUG=True
-   ALLOWED_HOSTS=localhost,127.0.0.1
-
-   # Database Configuration
-   DB_NAME=room_booking
-   DB_USER=room_admin
-   DB_PASSWORD=your-database-password
-   DB_HOST=localhost
-   DB_PORT=5432
-
-   # CORS Settings
-   CORS_ALLOWED_ORIGINS=http://localhost:3000
+   Generate a SECRET_KEY and create a `.env` file:
+   ```bash
+   cd room_booking
+   python generate_secret_key.py
    ```
-
-   **Important:** Replace the placeholder values with your actual configuration. For production, use a strong SECRET_KEY and set DEBUG=False.
+   
+   Copy `env.example` to `.env` and update with your values:
+   ```bash
+   # Windows PowerShell
+   Copy-Item env.example .env
+   
+   # macOS/Linux
+   cp env.example .env
+   ```
+   
+   Edit `.env` and replace:
+   - `SECRET_KEY` - Use the key from `generate_secret_key.py`
+   - `DB_PASSWORD` - Your PostgreSQL password
+   - Other values as needed
 
 5. **Set up PostgreSQL database**
    
@@ -129,85 +129,44 @@ A full-stack room booking system built with Django REST Framework backend and Re
 
 ## API Endpoints
 
+**Base URL:** `http://localhost:8000/api/`
+
 ### Authentication
-- `POST /api/auth/register/` - Register a new user
-- `POST /api/auth/login/` - Login and get JWT tokens
-- `POST /api/auth/refresh/` - Refresh JWT token
-- `GET /api/auth/user/` - Get current user details
+- `POST /auth/register/` - Register a new user
+- `POST /auth/login/` - Login and get JWT tokens
+- `POST /auth/refresh/` - Refresh JWT token
+- `GET /auth/user/` - Get current user details
 
 ### Floors & Rooms
-- `GET /api/floors/` - List all floors
-- `GET /api/rooms/` - List all rooms (optional query param: `?floor=<floor_id>`)
+- `GET /floors/` - List all floors
+- `GET /rooms/` - List all rooms (optional: `?floor=<floor_id>`)
 
 ### Bookings
-- `GET /api/bookings/` - List bookings (all for admin, own for regular users)
-- `POST /api/bookings/` - Create a new booking
-- `POST /api/create_booking/` - Create booking with floor/room selection
-- `GET /api/bookings/my` - Get current user's bookings
+- `GET /bookings/` - List bookings (all for admin, own for users)
+- `POST /create_booking/` - Create booking with room/floor selection
+- `GET /bookings/my` - Get current user's bookings
+- `GET /check_availability/` - Check room availability for a date
 
-## Using Postman
+## Quick Start
 
-### Step 1: Get JWT Token
+After completing the installation steps above:
 
-1. **Register a user** (if you haven't already):
-   - Method: `POST`
-   - URL: `http://localhost:8000/api/auth/register/`
-   - Headers: `Content-Type: application/json`
-   - Body (JSON):
-     ```json
-     {
-       "username": "testuser",
-       "email": "test@example.com",
-       "password": "testpass123",
-       "role": "user"
-     }
-     ```
-
-2. **Login to get JWT token**:
-   - Method: `POST`
-   - URL: `http://localhost:8000/api/auth/login/`
-   - Headers: `Content-Type: application/json`
-   - Body (JSON):
-     ```json
-     {
-       "email": "test@example.com",
-       "password": "testpass123"
-     }
-     ```
-   - Response will include `access` and `refresh` tokens. Copy the `access` token.
-
-### Step 2: Create a Booking
-
-1. **Set up the request**:
-   - Method: `POST`
-   - URL: `http://localhost:8000/api/create_booking/`
-   - Headers:
-     - `Content-Type: application/json`
-     - `Authorization: Bearer <your-access-token>` (replace `<your-access-token>` with the token from Step 1)
-   - Body (JSON):
-     ```json
-     {
-       "room_ids": [1, 2, 3],
-       "start_datetime": "2025-11-15T10:00:00",
-       "end_datetime": "2025-11-15T12:00:00"
-     }
-     ```
-   - **Note**: Use `start_datetime` and `end_datetime` (not `start_time`/`end_time`)
-
-2. **Alternative: Book by floor**:
-   ```json
-   {
-     "floor_id": 1,
-     "start_datetime": "2025-11-15T10:00:00",
-     "end_datetime": "2025-11-15T12:00:00"
-   }
+1. **Start the backend server** (in `room_booking` directory):
+   ```bash
+   python manage.py runserver
    ```
+   Backend runs at `http://localhost:8000`
 
-### Postman Tips
+2. **Start the frontend** (in `frontend` directory, new terminal):
+   ```bash
+   npm start
+   ```
+   Frontend runs at `http://localhost:3000`
 
-- **Save the token**: Create a Postman environment variable for the access token
-- **Auto-refresh**: Use the refresh token endpoint to get new access tokens when they expire
-- **Test other endpoints**: All booking endpoints require the `Authorization: Bearer <token>` header
+3. **Test the application**:
+   - Open `http://localhost:3000` in your browser
+   - Register a new user
+   - Login and start booking rooms!
 
 ## Project Structure
 

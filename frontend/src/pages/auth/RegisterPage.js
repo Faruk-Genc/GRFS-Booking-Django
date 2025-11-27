@@ -20,6 +20,19 @@ const RegisterPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    // Validate password length
+    if (formData.password.length < 8) {
+      setMessage('Password must be at least 8 characters long.');
+      return;
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email)) {
+      setMessage('Please enter a valid email address.');
+      return;
+    }
+
     // Set username to the email value
     const dataWithUsername = { ...formData, username: formData.email };
 
@@ -28,8 +41,12 @@ const RegisterPage = () => {
       setMessage('Registration successful! Please log in.');
       setTimeout(() => navigate('/login'), 2000);
     } catch (err) {
-      console.error('Registration error:', err.response?.data || err.message); // Log error details
-      setMessage('Error during registration.');
+      // Show user-friendly error message
+      const errorMessage = err.response?.data?.detail || 
+                          err.response?.data?.email?.[0] ||
+                          err.response?.data?.password?.[0] ||
+                          'Error during registration. Please try again.';
+      setMessage(errorMessage);
     }
   };
 
@@ -37,10 +54,36 @@ const RegisterPage = () => {
     <div className="register-container">
       <h2>Register</h2>
       <form onSubmit={handleSubmit}>
-        <input name="first_name" placeholder="First Name" onChange={handleChange} required />
-        <input name="last_name" placeholder="Last Name" onChange={handleChange} required />
-        <input name="email" placeholder="Email" onChange={handleChange} required />
-        <input type="password" name="password" placeholder="Password" onChange={handleChange} required />
+        <input 
+          name="first_name" 
+          placeholder="First Name" 
+          onChange={handleChange} 
+          required 
+          maxLength={50}
+        />
+        <input 
+          name="last_name" 
+          placeholder="Last Name" 
+          onChange={handleChange} 
+          required 
+          maxLength={50}
+        />
+        <input 
+          type="email"
+          name="email" 
+          placeholder="Email" 
+          onChange={handleChange} 
+          required 
+          maxLength={100}
+        />
+        <input 
+          type="password" 
+          name="password" 
+          placeholder="Password (min 8 characters)" 
+          onChange={handleChange} 
+          required 
+          minLength={8}
+        />
         <button type="submit">Register</button>
       </form>
       {message && <p className="success-message">{message}</p>}

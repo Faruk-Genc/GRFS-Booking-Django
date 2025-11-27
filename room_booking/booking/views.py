@@ -12,8 +12,11 @@ from django.utils import timezone
 from datetime import datetime, timedelta
 from django.db.models import Q
 import pytz
+import logging
 
 # Create your views here.
+
+logger = logging.getLogger(__name__)
 
 User = get_user_model()
 
@@ -45,15 +48,15 @@ def check_booking_conflicts(room_ids, start_datetime, end_datetime, exclude_book
         status__in=['Pending', 'Approved']  # Only check active bookings
     ).filter(
         Q(start_datetime__lt=end_dt) & Q(end_datetime__gt=start_dt)
-    ).distinct()
+    ).prefetch_related('rooms').distinct()
     
     if exclude_booking_id:
         conflicting_bookings = conflicting_bookings.exclude(id=exclude_booking_id)
     
     conflicts = []
     for booking in conflicting_bookings:
-        # Get the rooms that conflict
-        conflicting_rooms = booking.rooms.filter(id__in=room_ids)
+        # Get the rooms that conflict - use prefetched rooms to avoid N+1 queries
+        conflicting_rooms = [room for room in booking.rooms.all() if room.id in room_ids]
         for room in conflicting_rooms:
             conflicts.append({
                 'room_id': room.id,
@@ -149,50 +152,85 @@ class CreateBookingView(APIView):
                     {"detail": "End datetime must be after start datetime."}, 
                     status=status.HTTP_400_BAD_REQUEST
                 )
-
-            # Check for booking conflicts
-            conflicts = check_booking_conflicts(room_ids, start_datetime, end_datetime)
-            if conflicts:
-                # Format conflict details for user-friendly error message
-                conflict_details = []
-                unavailable_hours = []
-                for conflict in conflicts:
-                    conflict_details.append(
-                        f"Room '{conflict['room_name']}' is already booked from "
-                        f"{conflict['existing_start']} to {conflict['existing_end']}"
-                    )
-                    unavailable_hours.append({
-                        'room': conflict['room_name'],
-                        'start': conflict['existing_start'],
-                        'end': conflict['existing_end']
-                    })
-                
+            
+            # Validate that start_datetime is not in the past
+            now = timezone.now()
+            if start_datetime < now:
                 return Response(
-                    {
-                        "detail": "Some rooms are already booked during the requested time.",
-                        "conflicts": unavailable_hours,
-                        "conflict_messages": conflict_details
-                    }, 
-                    status=status.HTTP_409_CONFLICT
+                    {"detail": "Cannot create bookings in the past."}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Validate maximum booking duration (e.g., 8 hours)
+            max_duration = timedelta(hours=8)
+            if (end_datetime - start_datetime) > max_duration:
+                return Response(
+                    {"detail": "Booking duration cannot exceed 8 hours."}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Validate minimum booking duration (e.g., 1 hour)
+            min_duration = timedelta(hours=1)
+            if (end_datetime - start_datetime) < min_duration:
+                return Response(
+                    {"detail": "Booking duration must be at least 1 hour."}, 
+                    status=status.HTTP_400_BAD_REQUEST
                 )
 
-            # Create the booking with the selected rooms
-            # Pass datetime objects directly (serializer will handle them)
-            booking_data = {
-                "room_ids": room_ids,
-                "start_datetime": start_datetime,
-                "end_datetime": end_datetime,
-                "status": "Pending",
-            }
+            # Check for booking conflicts - use database transaction to prevent race conditions
+            from django.db import transaction
+            with transaction.atomic():
+                conflicts = check_booking_conflicts(room_ids, start_datetime, end_datetime)
+                if conflicts:
+                    # Format conflict details for user-friendly error message
+                    conflict_details = []
+                    unavailable_hours = []
+                    for conflict in conflicts:
+                        conflict_details.append(
+                            f"Room '{conflict['room_name']}' is already booked from "
+                            f"{conflict['existing_start']} to {conflict['existing_end']}"
+                        )
+                        unavailable_hours.append({
+                            'room': conflict['room_name'],
+                            'start': conflict['existing_start'],
+                            'end': conflict['existing_end']
+                        })
+                    
+                    return Response(
+                        {
+                            "detail": "Some rooms are already booked during the requested time.",
+                            "conflicts": unavailable_hours,
+                            "conflict_messages": conflict_details
+                        }, 
+                        status=status.HTTP_409_CONFLICT
+                    )
 
-            serializer = BookingSerializer(data=booking_data, context={'request': request})
-            if serializer.is_valid():
-                booking = serializer.save()  # Create booking
-                return Response(serializer.data, status=status.HTTP_201_CREATED)
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        except Exception as e:
+                # Create the booking with the selected rooms
+                # Pass datetime objects directly (serializer will handle them)
+                booking_data = {
+                    "room_ids": room_ids,
+                    "start_datetime": start_datetime,
+                    "end_datetime": end_datetime,
+                    "status": "Pending",
+                }
+
+                serializer = BookingSerializer(data=booking_data, context={'request': request})
+                if serializer.is_valid():
+                    booking = serializer.save()  # Create booking
+                    return Response(serializer.data, status=status.HTTP_201_CREATED)
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except (ValueError, TypeError, AttributeError) as e:
             return Response(
-                {"detail": f"An error occurred: {str(e)}"}, 
+                {"detail": f"Invalid input: {str(e)}"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            # Log the full error for debugging but return generic message
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error creating booking: {str(e)}", exc_info=True)
+            return Response(
+                {"detail": "An error occurred while creating the booking. Please try again later."}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
     
@@ -201,12 +239,20 @@ class FloorListView(APIView):
 
     def get(self, request):
         try:
-            floors = Floor.objects.all()
+            floors = Floor.objects.prefetch_related('rooms').all()
             serializer = FloorSerializer(floors, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)
-        except Exception as e:
+        except (ValueError, TypeError) as e:
             return Response(
-                {"detail": f"An error occurred while fetching floors: {str(e)}"}, 
+                {"detail": f"Invalid request: {str(e)}"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error fetching floors: {str(e)}", exc_info=True)
+            return Response(
+                {"detail": "An error occurred while fetching floors. Please try again later."}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
@@ -219,20 +265,35 @@ class RoomListView(APIView):
             if floor_id:
                 # Validate that the floor exists
                 try:
+                    floor_id = int(floor_id)
+                except (ValueError, TypeError):
+                    return Response(
+                        {"detail": "Invalid floor ID format."}, 
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                try:
                     Floor.objects.get(id=floor_id)
                 except Floor.DoesNotExist:
                     return Response(
                         {"detail": f"Floor with id {floor_id} does not exist."}, 
                         status=status.HTTP_404_NOT_FOUND
                     )
-                rooms = Room.objects.filter(floor_id=floor_id)  # Filter rooms by floor
+                rooms = Room.objects.select_related('floor').filter(floor_id=floor_id)  # Filter rooms by floor
             else:
-                rooms = Room.objects.all()  # Return all rooms if no floor ID is provided
+                rooms = Room.objects.select_related('floor').all()  # Return all rooms if no floor ID is provided
             serializer = RoomSerializer(rooms, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)
-        except Exception as e:
+        except (ValueError, TypeError) as e:
             return Response(
-                {"detail": f"An error occurred while fetching rooms: {str(e)}"}, 
+                {"detail": f"Invalid request: {str(e)}"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error fetching rooms: {str(e)}", exc_info=True)
+            return Response(
+                {"detail": "An error occurred while fetching rooms. Please try again later."}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
     
@@ -242,14 +303,21 @@ class BookingListCreateView(APIView):
     def get(self, request):
         try:
             if request.user.role == 'admin':
-                bookings = Booking.objects.all()
+                bookings = Booking.objects.select_related('user').prefetch_related('rooms', 'rooms__floor').all()
             else:
-                bookings = Booking.objects.filter(user=request.user)
+                bookings = Booking.objects.select_related('user').prefetch_related('rooms', 'rooms__floor').filter(user=request.user)
             serializer = BookingSerializer(bookings, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)
-        except Exception as e:
+        except (ValueError, TypeError) as e:
             return Response(
-                {"detail": f"An error occurred while fetching bookings: {str(e)}"}, 
+                {"detail": f"Invalid request: {str(e)}"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            # Log the full error for debugging but return generic message
+            logger.error(f"Error fetching bookings: {str(e)}", exc_info=True)
+            return Response(
+                {"detail": "An error occurred while fetching bookings. Please try again later."}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
     
@@ -260,9 +328,17 @@ class BookingListCreateView(APIView):
                 serializer.save()
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        except Exception as e:
+        except (ValueError, TypeError, AttributeError) as e:
             return Response(
-                {"detail": f"An error occurred while creating booking: {str(e)}"}, 
+                {"detail": f"Invalid input: {str(e)}"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error creating booking: {str(e)}", exc_info=True)
+            return Response(
+                {"detail": "An error occurred while creating booking. Please try again later."}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
@@ -271,12 +347,21 @@ class MyBookingView(APIView):
     
     def get(self, request):
         try:
-            bookings = Booking.objects.filter(user=request.user)
+            bookings = Booking.objects.select_related('user').prefetch_related('rooms', 'rooms__floor').filter(user=request.user)
             serializer = BookingSerializer(bookings, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)
-        except Exception as e:
+        except (ValueError, TypeError) as e:
             return Response(
-                {"detail": f"An error occurred while fetching your bookings: {str(e)}"}, 
+                {"detail": f"Invalid request: {str(e)}"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            # Log the full error for debugging but return generic message
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error fetching user bookings: {str(e)}", exc_info=True)
+            return Response(
+                {"detail": "An error occurred while fetching your bookings. Please try again later."}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
     
@@ -303,9 +388,17 @@ class UserDetailView(APIView):
         try:
             serializer = UserSerializer(request.user)
             return Response(serializer.data, status=status.HTTP_200_OK)
-        except Exception as e:
+        except (ValueError, TypeError, AttributeError) as e:
             return Response(
-                {"detail": f"An error occurred while fetching user details: {str(e)}"}, 
+                {"detail": f"Invalid request: {str(e)}"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error fetching user details: {str(e)}", exc_info=True)
+            return Response(
+                {"detail": "An error occurred while fetching user details. Please try again later."}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
@@ -352,8 +445,10 @@ class CheckAvailabilityView(APIView):
                 )
             
             # Get all bookings for these rooms on this date
-            start_of_day = timezone.make_aware(datetime.combine(check_date, datetime.min.time()))
-            end_of_day = timezone.make_aware(datetime.combine(check_date, datetime.max.time()))
+            # Use EST timezone for consistency
+            est = pytz.timezone('America/New_York')
+            start_of_day = est.localize(datetime.combine(check_date, datetime.min.time()))
+            end_of_day = est.localize(datetime.combine(check_date, datetime.max.time()))
             
             bookings = Booking.objects.filter(
                 rooms__id__in=room_ids,
@@ -434,8 +529,16 @@ class CheckAvailabilityView(APIView):
                 'all_hours': all_hours
             }, status=status.HTTP_200_OK)
             
-        except Exception as e:
+        except (ValueError, TypeError, AttributeError) as e:
             return Response(
-                {"detail": f"An error occurred while checking availability: {str(e)}"}, 
+                {"detail": f"Invalid input: {str(e)}"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error checking availability: {str(e)}", exc_info=True)
+            return Response(
+                {"detail": "An error occurred while checking availability. Please try again later."}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )

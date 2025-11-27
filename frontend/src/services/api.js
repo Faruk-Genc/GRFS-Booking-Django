@@ -13,6 +13,40 @@ API.interceptors.request.use((config) => {
   return config;
 });
 
+// Handle token refresh on 401 errors
+API.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config;
+    
+    // If error is 401 and we haven't already retried
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+      
+      try {
+        const refreshToken = localStorage.getItem('refresh');
+        if (refreshToken) {
+          const response = await axios.post('http://localhost:8000/api/auth/refresh/', {
+            refresh: refreshToken
+          });
+          const { access } = response.data;
+          localStorage.setItem('access', access);
+          originalRequest.headers.Authorization = `Bearer ${access}`;
+          return API(originalRequest);
+        }
+      } catch (refreshError) {
+        // Refresh failed, redirect to login
+        localStorage.removeItem('access');
+        localStorage.removeItem('refresh');
+        window.location.href = '/login';
+        return Promise.reject(refreshError);
+      }
+    }
+    
+    return Promise.reject(error);
+  }
+);
+
 export default API;
 export const registerUser = async (data) => {
   return await API.post('auth/register/', data);

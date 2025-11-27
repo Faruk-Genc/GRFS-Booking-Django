@@ -17,8 +17,13 @@ const PrivateRoute = ({ children }) => {
 
       try {
         // Validate token by making an authenticated request
-        await getUser();
-        setIsAuthenticated(true);
+        const response = await getUser();
+        // Check if we got a valid response
+        if (response && response.data) {
+          setIsAuthenticated(true);
+        } else {
+          throw new Error('Invalid response');
+        }
       } catch (error) {
         // Token is invalid or expired
         localStorage.removeItem('access');
