@@ -10,6 +10,7 @@ const RegisterPage = () => {
     last_name: '',
     email: '',
     password: '',
+    gender: '',
   });
   const [message, setMessage] = useState('');
 
@@ -76,6 +77,17 @@ const RegisterPage = () => {
           required 
           maxLength={100}
         />
+        <select
+          name="gender"
+          value={formData.gender}
+          onChange={handleChange}
+          required
+          className="form-select"
+        >
+          <option value="">Select Gender</option>
+          <option value="male">Abi</option>
+          <option value="female">Abla</option>
+        </select>
         <input 
           type="password" 
           name="password" 

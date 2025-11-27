@@ -9,7 +9,7 @@ class UserSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'role', 'password']
+        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'role', 'gender', 'password']
         read_only_fields = ['role']  # Role cannot be set via API, only by admins
 
     def validate_email(self, value):
@@ -24,6 +24,12 @@ class UserSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Password must be at least 8 characters long.")
         return value
 
+    def validate_gender(self, value):
+        """Validate gender choice"""
+        if value and value not in ['male', 'female']:
+            raise serializers.ValidationError("Gender must be either 'male' or 'female'.")
+        return value
+
     def create(self, validated_data):
         # Force role to 'user' during registration - only admins can change roles
         # Remove role from validated_data if present to prevent role escalation
@@ -33,6 +39,7 @@ class UserSerializer(serializers.ModelSerializer):
             email=validated_data.get('email', ''),
             first_name=validated_data.get('first_name', ''),
             last_name=validated_data.get('last_name', ''),
+            gender=validated_data.get('gender', ''),
             role='user'  # Always set to 'user' on registration for security
         )
 

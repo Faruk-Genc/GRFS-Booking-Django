@@ -27,6 +27,27 @@
     border-color: #4CAF50;
     box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
   }
+  
+  .register-container select,
+  .register-container .form-select {
+    width: 100%;
+    padding: 10px;
+    margin: 10px 0;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    box-sizing: border-box;
+    font-size: 16px;
+    font-family: inherit;
+    background-color: white;
+    cursor: pointer;
+  }
+  
+  .register-container select:focus,
+  .register-container .form-select:focus {
+    outline: none;
+    border-color: #4CAF50;
+    box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
+  }
   .register-container button {
     width: 100%;
     padding: 12px;

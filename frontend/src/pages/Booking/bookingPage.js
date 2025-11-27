@@ -154,7 +154,13 @@ const BookingPage = () => {
         ))}
       </div>
 
-      <button onClick={handleSubmit}>Go to Booking Form</button>
+      <button 
+        onClick={handleSubmit} 
+        className="booking-form-btn"
+        disabled={selectedRooms.length === 0 && selectedFloors.length === 0}
+      >
+        Go to Booking Form
+      </button>
     </div>
   );
 };
