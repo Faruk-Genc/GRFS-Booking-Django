@@ -5,8 +5,10 @@ import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
 import Dashboard from './pages/dashboard/Dashboard';
 import PrivateRoute from './components/PrivateRoute';
+import AdminRoute from './components/AdminRoute';
 import BookingPage from './pages/Booking/bookingPage';
 import BookingForm from './pages/Booking/BookingForm';
+import AdminDashboard from './pages/dashboard/AdminDashboard';
 
 function App() {
   return (
@@ -36,6 +38,16 @@ function App() {
           element={
             <PrivateRoute>
               <BookingForm />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/admin"
+          element={
+            <PrivateRoute>
+              <AdminRoute>
+                <AdminDashboard />
+              </AdminRoute>
             </PrivateRoute>
           }
         />

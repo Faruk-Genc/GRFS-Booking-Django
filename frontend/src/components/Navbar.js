@@ -42,7 +42,7 @@ const Navbar = () => {
                 <Link to="/admin" className="navbar-link">Admin</Link>
               )}
               <div className="navbar-user">
-                <span className="navbar-username">{user.username}</span>
+                <span className="navbar-username">{user.first_name} {user.last_name}</span>
                 <button onClick={handleLogout} className="navbar-logout">Logout</button>
               </div>
             </>

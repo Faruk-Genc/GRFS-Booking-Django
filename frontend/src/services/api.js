@@ -93,3 +93,7 @@ export const updateBooking = async (bookingId, data) => {
 export const deleteBooking = async (bookingId) => {
   return await API.delete(`bookings/${bookingId}/`);
 };
+
+export const getAllBookings = async () => {
+  return await API.get('bookings/');
+};
