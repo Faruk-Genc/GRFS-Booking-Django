@@ -47,7 +47,7 @@ h2 {
 }
 
 .floor-header:hover {
-  background-color: #1abc9c;
+  background-color: #0f2447;
 }
 
 /* Room List Container */
@@ -80,19 +80,19 @@ h2 {
 
 /* Add a color for each floor header */
 .floor-header:nth-child(1) {
-  background-color: #6fb3b8; /* Green */
+  background-color: #1a3970; /* Blue */
 }
 
 .floor-header:nth-child(2) {
-  background-color: #2e4053; /* Dark Blue */
+  background-color: #1a3970; /* Blue */
 }
 
 .floor-header:nth-child(3) {
-  background-color: #8e44ad; /* Purple */
+  background-color: #1a3970; /* Blue */
 }
 
 .floor-header:nth-child(4) {
-  background-color: #27ae60; /* Light Green */
+  background-color: #1a3970; /* Blue */
 }
 
 /* Room Item Layout */
@@ -115,8 +115,8 @@ h2 {
 
 /* Book Entire Floor Button */
 .book-floor-btn {
-  background-color: #c2edce;
-  color: #388087;
+  background-color: #1a3970;
+  color: #ffffff;
   padding: 10px 20px;
   border: none;
   border-radius: 5px;
@@ -127,7 +127,7 @@ h2 {
 }
 
 .book-floor-btn:hover {
-  background-color: #2980b9;
+  background-color: #0f2447;
 }
 
 /* Checkbox Styling for Room Selection */
@@ -172,26 +172,26 @@ input[type='checkbox'] {
   padding: 16px 32px;
   font-size: 18px;
   font-weight: 600;
-  color: white;
-  background-color: #3498db;
+  color: #ffffff;
+  background-color: #1a3970;
   border: none;
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.3s ease;
-  box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
+  box-shadow: 0 4px 12px rgba(26, 57, 112, 0.3);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
 .booking-form-btn:hover {
-  background-color: #2980b9;
+  background-color: #0f2447;
   transform: translateY(-2px);
-  box-shadow: 0 6px 18px rgba(52, 152, 219, 0.4);
+  box-shadow: 0 6px 18px rgba(26, 57, 112, 0.4);
 }
 
 .booking-form-btn:active {
   transform: translateY(0);
-  box-shadow: 0 2px 8px rgba(52, 152, 219, 0.3);
+  box-shadow: 0 2px 8px rgba(26, 57, 112, 0.3);
 }
 
 .booking-form-btn:disabled {
@@ -246,7 +246,7 @@ input[type='checkbox'] {
 
 .form-input:focus {
   outline: none;
-  border-color: #16a085;
+  border-color: #1a3970;
 }
 
 .form-input select {
@@ -265,14 +265,14 @@ input[type='checkbox'] {
 }
 
 .date-input:hover {
-  border-color: #16a085;
+  border-color: #1a3970;
   background-color: #f9f9f9;
-  box-shadow: 0 2px 4px rgba(22, 160, 133, 0.1);
+  box-shadow: 0 2px 4px rgba(26, 57, 112, 0.1);
 }
 
 .date-input:focus {
-  border-color: #16a085;
-  box-shadow: 0 0 0 3px rgba(22, 160, 133, 0.2);
+  border-color: #1a3970;
+  box-shadow: 0 0 0 3px rgba(26, 57, 112, 0.2);
   background-color: #fff;
 }
 
@@ -356,8 +356,8 @@ input[type='checkbox'] {
 }
 
 .hour-badge.unavailable {
-  background-color: #f44336;
-  color: white;
+  background-color: #d40000;
+  color: #ffffff;
 }
 
 /* Unavailable Info */
@@ -385,11 +385,11 @@ input[type='checkbox'] {
 
 /* No Availability Message */
 .no-availability {
-  background-color: #ffebee;
+  background-color: #ffe5e5;
   padding: 20px;
   border-radius: 5px;
   text-align: center;
-  color: #c62828;
+  color: #d40000;
   font-weight: 600;
 }
 
@@ -403,12 +403,12 @@ input[type='checkbox'] {
 
 /* Error Messages */
 .error-message {
-  background-color: #ffebee;
-  color: #c62828;
+  background-color: #ffe5e5;
+  color: #d40000;
   padding: 15px;
   border-radius: 5px;
   margin: 15px 0;
-  border-left: 4px solid #c62828;
+  border-left: 4px solid #d40000;
 }
 
 /* Conflict Details */
@@ -450,8 +450,8 @@ input[type='checkbox'] {
 }
 
 .btn-primary {
-  background-color: #16a085;
-  color: white;
+  background-color: #1a3970;
+  color: #ffffff;
   padding: 12px 30px;
   border: none;
   border-radius: 5px;
@@ -462,7 +462,7 @@ input[type='checkbox'] {
 }
 
 .btn-primary:hover:not(:disabled) {
-  background-color: #138d75;
+  background-color: #0f2447;
 }
 
 .btn-primary:disabled {

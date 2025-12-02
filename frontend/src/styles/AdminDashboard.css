@@ -40,9 +40,9 @@
 
 .view-btn {
   padding: 10px 20px;
-  border: 2px solid #4a90e2;
-  background: white;
-  color: #4a90e2;
+  border: 2px solid #1a3970;
+  background: #ffffff;
+  color: #1a3970;
   border-radius: 6px;
   cursor: pointer;
   font-size: 14px;
@@ -51,13 +51,13 @@
 }
 
 .view-btn:hover {
-  background: #4a90e2;
-  color: white;
+  background: #1a3970;
+  color: #ffffff;
 }
 
 .view-btn.active {
-  background: #4a90e2;
-  color: white;
+  background: #1a3970;
+  color: #ffffff;
 }
 
 .calendar-navigation {
@@ -81,17 +81,17 @@
 
 .nav-btn:hover {
   background: #f0f0f0;
-  border-color: #4a90e2;
+  border-color: #1a3970;
 }
 
 .today-btn {
-  background: #4a90e2;
-  color: white;
-  border-color: #4a90e2;
+  background: #1a3970;
+  color: #ffffff;
+  border-color: #1a3970;
 }
 
 .today-btn:hover {
-  background: #357abd;
+  background: #0f2447;
 }
 
 .current-date-display {
@@ -127,13 +127,13 @@
 }
 
 .room-select:hover {
-  border-color: #4a90e2;
+  border-color: #1a3970;
 }
 
 .room-select:focus {
   outline: none;
-  border-color: #4a90e2;
-  box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.2);
+  border-color: #1a3970;
+  box-shadow: 0 0 0 2px rgba(26, 57, 112, 0.2);
 }
 
 .calendar-container {
@@ -303,8 +303,8 @@
 }
 
 .month-day-cell.today {
-  background: #e3f2fd;
-  border: 2px solid #4a90e2;
+  background: #e8edf5;
+  border: 2px solid #1a3970;
 }
 
 .month-day-number {
@@ -315,7 +315,7 @@
 }
 
 .month-day-cell.today .month-day-number {
-  color: #4a90e2;
+  color: #1a3970;
   font-weight: 700;
 }
 
@@ -492,7 +492,7 @@
 }
 
 .admin-dashboard-error {
-  color: #d32f2f;
+  color: #d40000;
 }
 
 /* Booking Modal Styles */
@@ -643,8 +643,8 @@
 
 .delete-btn {
   padding: 10px 20px;
-  background: #d32f2f;
-  color: white;
+  background: #d40000;
+  color: #ffffff;
   border: none;
   border-radius: 4px;
   cursor: pointer;
@@ -655,7 +655,7 @@
 }
 
 .delete-btn:hover {
-  background: #b71c1c;
+  background: #a30000;
 }
 
 .status-badge {
@@ -711,8 +711,8 @@
 
 .edit-form-group .form-input:focus {
   outline: none;
-  border-color: #4a90e2;
-  box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.2);
+  border-color: #1a3970;
+  box-shadow: 0 0 0 2px rgba(26, 57, 112, 0.2);
 }
 
 .edit-form-group .date-input {
@@ -768,8 +768,8 @@
 
 .edit-btn {
   padding: 10px 20px;
-  background: #4a90e2;
-  color: white;
+  background: #1a3970;
+  color: #ffffff;
   border: none;
   border-radius: 4px;
   cursor: pointer;
@@ -781,7 +781,7 @@
 }
 
 .edit-btn:hover {
-  background: #357abd;
+  background: #0f2447;
 }
 
 /* Responsive Design */

@@ -10,7 +10,7 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['id', 'username', 'email', 'first_name', 'last_name', 'role', 'gender', 'password', 'approval_status']
-        read_only_fields = ['approval_status']  # Approval status cannot be set via regular API, only by admins
+        read_only_fields = ['role', 'approval_status']  # Role and approval status cannot be set via regular API, only by admins
 
     def validate_email(self, value):
         """Validate email format"""

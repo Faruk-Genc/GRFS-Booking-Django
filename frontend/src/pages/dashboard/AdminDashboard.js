@@ -681,7 +681,7 @@ const AdminDashboard = () => {
       </div>
 
       {showPendingUsers && (
-        <div className="pending-users-section" style={{ marginBottom: '20px', padding: '20px', backgroundColor: '#f5f5f5', borderRadius: '8px' }}>
+        <div className="pending-users-section" style={{ marginBottom: '20px', padding: '20px', backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #ddd' }}>
           <h2>Pending User Approvals ({pendingUsers.length})</h2>
           {pendingUsers.length === 0 ? (
             <p>No pending users at this time.</p>
@@ -691,7 +691,7 @@ const AdminDashboard = () => {
                 <div key={user.id} className="pending-user-card" style={{ 
                   padding: '15px', 
                   marginBottom: '10px', 
-                  backgroundColor: 'white', 
+                  backgroundColor: '#ffffff', 
                   borderRadius: '5px',
                   border: '1px solid #ddd',
                   display: 'flex',
@@ -720,8 +720,8 @@ const AdminDashboard = () => {
                         onClick={() => handleApproveUser(user.id, 'approve')}
                         style={{
                           padding: '8px 16px',
-                          backgroundColor: '#28a745',
-                          color: 'white',
+                          backgroundColor: '#1a3970',
+                          color: '#ffffff',
                           border: 'none',
                           borderRadius: '4px',
                           cursor: 'pointer'
@@ -733,8 +733,8 @@ const AdminDashboard = () => {
                         onClick={() => handleApproveUser(user.id, 'deny')}
                         style={{
                           padding: '8px 16px',
-                          backgroundColor: '#dc3545',
-                          color: 'white',
+                          backgroundColor: '#d40000',
+                          color: '#ffffff',
                           border: 'none',
                           borderRadius: '4px',
                           cursor: 'pointer'

@@ -96,8 +96,8 @@
 }
 
 .status-cancelled {
-  background-color: #e74c3c;
-  color: white;
+  background-color: #d40000;
+  color: #ffffff;
 }
 
 .booking-details {
@@ -177,21 +177,21 @@
 }
 
 .btn-edit {
-  background-color: #3498db;
-  color: white;
+  background-color: #1a3970;
+  color: #ffffff;
 }
 
 .btn-edit:hover {
-  background-color: #2980b9;
+  background-color: #0f2447;
 }
 
 .btn-delete {
-  background-color: #e74c3c;
-  color: white;
+  background-color: #d40000;
+  color: #ffffff;
 }
 
 .btn-delete:hover {
-  background-color: #c0392b;
+  background-color: #a30000;
 }
 
 .btn-save {
@@ -248,7 +248,7 @@
 .edit-form input:focus,
 .edit-form select:focus {
   outline: none;
-  border-color: #3498db;
+  border-color: #1a3970;
 }
 
 .edit-form .date-input {
@@ -262,14 +262,14 @@
 }
 
 .edit-form .date-input:hover {
-  border-color: #3498db;
+  border-color: #1a3970;
   background-color: #f9f9f9;
-  box-shadow: 0 2px 4px rgba(52, 152, 219, 0.1);
+  box-shadow: 0 2px 4px rgba(26, 57, 112, 0.1);
 }
 
 .edit-form .date-input:focus {
-  border-color: #3498db;
-  box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2);
+  border-color: #1a3970;
+  box-shadow: 0 0 0 3px rgba(26, 57, 112, 0.2);
   background-color: #fff;
 }
 
@@ -334,12 +334,12 @@
 }
 
 .error-message {
-  background-color: #ffebee;
-  color: #c62828;
+  background-color: #ffe5e5;
+  color: #d40000;
   padding: 15px;
   border-radius: 5px;
   margin-bottom: 20px;
-  border-left: 4px solid #c62828;
+  border-left: 4px solid #d40000;
 }
 
 /* Responsive */

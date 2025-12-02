@@ -1,6 +1,6 @@
 .navbar {
-  background-color: #388087;
-  color: white;
+  background-color: #1a3970;
+  color: #ffffff;
   padding: 0;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   position: sticky;
@@ -19,15 +19,33 @@
 }
 
 .navbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   font-size: 24px;
   font-weight: bold;
-  color: white;
+  color: #ffffff;
   text-decoration: none;
-  transition: color 0.3s ease;
+  transition: opacity 0.3s ease;
 }
 
 .navbar-brand:hover {
-  color: #3498db;
+  opacity: 0.9;
+}
+
+.navbar-logo {
+  height: 45px;
+  width: auto;
+  object-fit: contain;
+}
+
+.navbar-brand-text {
+  color: #ffffff;
+  transition: color 0.3s ease;
+}
+
+.navbar-brand:hover .navbar-brand-text {
+  color: #d40000;
 }
 
 .navbar-menu {
@@ -64,8 +82,8 @@
 }
 
 .navbar-logout {
-  background-color: #e74c3c;
-  color: white;
+  background-color: #d40000;
+  color: #ffffff;
   border: none;
   padding: 8px 16px;
   border-radius: 4px;
@@ -75,7 +93,7 @@
 }
 
 .navbar-logout:hover {
-  background-color: #c0392b;
+  background-color: #a30000;
 }
 
 /* Responsive */
@@ -84,6 +102,14 @@
     flex-direction: column;
     height: auto;
     padding: 10px 20px;
+  }
+
+  .navbar-brand {
+    font-size: 20px;
+  }
+
+  .navbar-logo {
+    height: 35px;
   }
 
   .navbar-menu {

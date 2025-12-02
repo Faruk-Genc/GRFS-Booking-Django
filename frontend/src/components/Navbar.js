@@ -31,7 +31,12 @@ const Navbar = () => {
     <nav className="navbar">
       <div className="navbar-container">
         <Link to="/dashboard" className="navbar-brand">
-          GRFS Booking
+          <img 
+            src="/grfs-logo.png" 
+            alt="Grand River Friendship Society" 
+            className="navbar-logo"
+          />
+          <span className="navbar-brand-text">GRFS Booking</span>
         </Link>
         <div className="navbar-menu">
           {user ? (
