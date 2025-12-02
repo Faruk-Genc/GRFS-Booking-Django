@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { getAllBookings, getRooms, deleteBooking, updateBooking, checkAvailability } from '../../services/api';
+import { getAllBookings, getRooms, deleteBooking, updateBooking, checkAvailability, getPendingUsers, approveUser } from '../../services/api';
 import '../../styles/AdminDashboard.css';
 
 const AdminDashboard = () => {
@@ -17,6 +17,9 @@ const AdminDashboard = () => {
   const [editAvailableHours, setEditAvailableHours] = useState([]);
   const [editUnavailableSlots, setEditUnavailableSlots] = useState([]);
   const [editLoading, setEditLoading] = useState(false);
+  const [pendingUsers, setPendingUsers] = useState([]);
+  const [showPendingUsers, setShowPendingUsers] = useState(false);
+  const [selectedUserRole, setSelectedUserRole] = useState({});
 
   const fetchEditAvailability = useCallback(async (date, roomIds) => {
     if (!date || roomIds.length === 0) return;
@@ -38,7 +41,35 @@ const AdminDashboard = () => {
   useEffect(() => {
     fetchBookings();
     fetchRooms();
+    fetchPendingUsers();
   }, []);
+
+  const fetchPendingUsers = async () => {
+    try {
+      const response = await getPendingUsers();
+      setPendingUsers(response.data || []);
+    } catch (err) {
+      console.error('Failed to fetch pending users:', err);
+    }
+  };
+
+  const handleApproveUser = async (userId, action) => {
+    try {
+      const role = selectedUserRole[userId] || null;
+      await approveUser(userId, action, role);
+      // Remove user from pending list
+      setPendingUsers(prev => prev.filter(user => user.id !== userId));
+      // Clear role selection for this user
+      setSelectedUserRole(prev => {
+        const newState = { ...prev };
+        delete newState[userId];
+        return newState;
+      });
+      alert(action === 'approve' ? 'User approved successfully!' : 'User denied successfully!');
+    } catch (err) {
+      alert(err.response?.data?.detail || `Failed to ${action} user`);
+    }
+  };
 
   useEffect(() => {
     if (isEditing && editForm.selectedDate && editForm.room_ids) {
@@ -616,7 +647,13 @@ const AdminDashboard = () => {
           )}
         </div>
         <div className="header-top">
-          
+          <button 
+            className={`view-btn ${showPendingUsers ? 'active' : ''}`}
+            onClick={() => setShowPendingUsers(!showPendingUsers)}
+            style={{ marginRight: '10px' }}
+          >
+            {showPendingUsers ? 'Hide' : 'Show'} Pending Users ({pendingUsers.length})
+          </button>
           <div className="view-controls">
             <button 
               className={`view-btn ${viewMode === 'day' ? 'active' : ''}`}
@@ -642,6 +679,77 @@ const AdminDashboard = () => {
           </div>
         </div>
       </div>
+
+      {showPendingUsers && (
+        <div className="pending-users-section" style={{ marginBottom: '20px', padding: '20px', backgroundColor: '#f5f5f5', borderRadius: '8px' }}>
+          <h2>Pending User Approvals ({pendingUsers.length})</h2>
+          {pendingUsers.length === 0 ? (
+            <p>No pending users at this time.</p>
+          ) : (
+            <div className="pending-users-list">
+              {pendingUsers.map(user => (
+                <div key={user.id} className="pending-user-card" style={{ 
+                  padding: '15px', 
+                  marginBottom: '10px', 
+                  backgroundColor: 'white', 
+                  borderRadius: '5px',
+                  border: '1px solid #ddd',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}>
+                  <div className="user-info">
+                    <div><strong>{user.first_name} {user.last_name}</strong></div>
+                    <div>Email: {user.email}</div>
+                    <div>Username: {user.username}</div>
+                    {user.gender && <div>Gender: {user.gender}</div>}
+                  </div>
+                  <div className="user-actions" style={{ display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'flex-end' }}>
+                    <select
+                      value={selectedUserRole[user.id] || 'user'}
+                      onChange={(e) => setSelectedUserRole(prev => ({ ...prev, [user.id]: e.target.value }))}
+                      style={{ padding: '5px', borderRadius: '4px' }}
+                    >
+                      <option value="user">User</option>
+                      <option value="mentor">Mentor</option>
+                      <option value="coordinator">Coordinator</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                      <button
+                        onClick={() => handleApproveUser(user.id, 'approve')}
+                        style={{
+                          padding: '8px 16px',
+                          backgroundColor: '#28a745',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Approve
+                      </button>
+                      <button
+                        onClick={() => handleApproveUser(user.id, 'deny')}
+                        style={{
+                          padding: '8px 16px',
+                          backgroundColor: '#dc3545',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Deny
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="calendar-container">
         {viewMode === 'day' && renderDayView()}
@@ -730,7 +838,7 @@ const AdminDashboard = () => {
                 <>
                   <div className="booking-detail-item">
                     <label>User:</label>
-                    <span>{selectedBooking.user.username} ({selectedBooking.user.email})</span>
+                    <span>{selectedBooking.user.first_name} {selectedBooking.user.last_name} ({selectedBooking.user.email})</span>
                   </div>
                   <div className="booking-detail-item">
                     <label>Rooms:</label>

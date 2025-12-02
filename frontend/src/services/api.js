@@ -97,3 +97,11 @@ export const deleteBooking = async (bookingId) => {
 export const getAllBookings = async () => {
   return await API.get('bookings/');
 };
+
+export const getPendingUsers = async () => {
+  return await API.get('admin/pending-users/');
+};
+
+export const approveUser = async (userId, action, role = null) => {
+  return await API.post(`admin/approve-user/${userId}/`, { action, role });
+};

@@ -345,7 +345,7 @@ const Dashboard = () => {
                       </div>
                       <div className="right-side">
                         <button onClick={() => handleEdit(booking)} className="btn-edit">Edit</button>
-                        <button onClick={() => handleDelete(booking.id)} className="btn-delete">Cancel</button>
+                        <button onClick={() => handleDelete(booking.id)} className="btn-delete">Delete</button>
                       </div>
                     </div>
                       <div className="booking-details-compact">

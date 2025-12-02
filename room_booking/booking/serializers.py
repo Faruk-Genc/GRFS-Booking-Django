@@ -9,8 +9,8 @@ class UserSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'role', 'gender', 'password']
-        read_only_fields = ['role']  # Role cannot be set via API, only by admins
+        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'role', 'gender', 'password', 'approval_status']
+        read_only_fields = ['approval_status']  # Approval status cannot be set via regular API, only by admins
 
     def validate_email(self, value):
         """Validate email format"""
@@ -40,7 +40,8 @@ class UserSerializer(serializers.ModelSerializer):
             first_name=validated_data.get('first_name', ''),
             last_name=validated_data.get('last_name', ''),
             gender=validated_data.get('gender', ''),
-            role='user'  # Always set to 'user' on registration for security
+            role='user',  # Always set to 'user' on registration for security
+            approval_status='pending'  # New users require admin approval
         )
 
         user.set_password(validated_data['password'])

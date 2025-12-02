@@ -2,6 +2,7 @@ from django.shortcuts import render
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions, generics
+from rest_framework import serializers
 from .models import Booking, Room, Floor
 from .serializers import *
 from django.contrib.auth import get_user_model
@@ -538,6 +539,22 @@ class LoginSerializer(TokenObtainPairSerializer):
         token['username'] = user.username
         token['role'] = user.role
         return token
+    
+    def validate(self, attrs):
+        data = super().validate(attrs)
+        user = self.user
+        
+        # Check if user is approved
+        if user.approval_status == 'pending':
+            raise serializers.ValidationError(
+                {"detail": "Your account is pending approval. Please wait for an admin to approve your account."}
+            )
+        elif user.approval_status == 'denied':
+            raise serializers.ValidationError(
+                {"detail": "Your account has been denied. Please contact an administrator."}
+            )
+        
+        return data
 
 class LoginView(TokenObtainPairView):
     serializer_class = LoginSerializer
@@ -701,5 +718,77 @@ class CheckAvailabilityView(APIView):
             logger.error(f"Error checking availability: {str(e)}", exc_info=True)
             return Response(
                 {"detail": "An error occurred while checking availability. Please try again later."}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+class PendingUsersView(APIView):
+    """View to list all pending users - Admin only"""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get(self, request):
+        try:
+            # Only admins can view pending users
+            if request.user.role != 'admin':
+                return Response(
+                    {"detail": "You do not have permission to view pending users."}, 
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            # Get all users with pending approval status
+            pending_users = User.objects.filter(approval_status='pending').order_by('-date_joined')
+            serializer = UserSerializer(pending_users, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except Exception as e:
+            logger.error(f"Error fetching pending users: {str(e)}", exc_info=True)
+            return Response(
+                {"detail": "An error occurred while fetching pending users."}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+class ApproveUserView(APIView):
+    """View to approve/deny users and assign roles - Admin only"""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def post(self, request, user_id):
+        try:
+            # Only admins can approve/deny users
+            if request.user.role != 'admin':
+                return Response(
+                    {"detail": "You do not have permission to approve users."}, 
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            user = get_object_or_404(User, id=user_id)
+            action = request.data.get('action')  # 'approve' or 'deny'
+            new_role = request.data.get('role', None)  # Optional role assignment
+            
+            if action == 'approve':
+                user.approval_status = 'approved'
+                # If role is provided, update it
+                if new_role and new_role in [choice[0] for choice in User.ROLE_CHOICES]:
+                    user.role = new_role
+                user.save()
+                serializer = UserSerializer(user)
+                return Response(
+                    {"detail": "User approved successfully.", "user": serializer.data}, 
+                    status=status.HTTP_200_OK
+                )
+            elif action == 'deny':
+                user.approval_status = 'denied'
+                user.save()
+                serializer = UserSerializer(user)
+                return Response(
+                    {"detail": "User denied successfully.", "user": serializer.data}, 
+                    status=status.HTTP_200_OK
+                )
+            else:
+                return Response(
+                    {"detail": "Invalid action. Use 'approve' or 'deny'."}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        except Exception as e:
+            logger.error(f"Error processing user approval: {str(e)}", exc_info=True)
+            return Response(
+                {"detail": "An error occurred while processing the request."}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )

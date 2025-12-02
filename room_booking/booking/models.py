@@ -22,6 +22,18 @@ class CustomUser(AbstractUser):
         ('female', 'Female'),
     ]
     gender = models.CharField(max_length=10, choices=GENDER_CHOICES, blank=True, null=True)
+    
+    APPROVAL_STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('approved', 'Approved'),
+        ('denied', 'Denied'),
+    ]
+    approval_status = models.CharField(
+        max_length=20, 
+        choices=APPROVAL_STATUS_CHOICES, 
+        default='pending',
+        db_index=True
+    )
 
     def __str__(self):
         return f"{self.username} ({self.role})"

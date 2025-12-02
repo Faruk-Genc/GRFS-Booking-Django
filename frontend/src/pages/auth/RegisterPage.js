@@ -39,8 +39,8 @@ const RegisterPage = () => {
 
     try {
       await registerUser(dataWithUsername);
-      setMessage('Registration successful! Please log in.');
-      setTimeout(() => navigate('/login'), 2000);
+      setMessage('Registration successful! Your account is pending approval. You will be able to log in once an administrator approves your account.');
+      setTimeout(() => navigate('/login'), 4000);
     } catch (err) {
       // Show user-friendly error message
       const errorMessage = err.response?.data?.detail || 
@@ -85,8 +85,8 @@ const RegisterPage = () => {
           className="form-select"
         >
           <option value="">Select Gender</option>
-          <option value="male">Abi</option>
-          <option value="female">Abla</option>
+          <option value="male">Male</option>
+          <option value="female">Female</option>
         </select>
         <input 
           type="password" 
