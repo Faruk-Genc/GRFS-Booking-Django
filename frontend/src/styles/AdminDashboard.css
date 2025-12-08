@@ -784,6 +784,22 @@
   background: #0f2447;
 }
 
+.delete-all-btn {
+  padding: 10px 20px;
+  background: #d40000;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: background-color 0.3s ease;
+}
+
+.delete-all-btn:hover {
+  background: #a30000;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
   .header-top {

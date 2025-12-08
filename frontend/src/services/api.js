@@ -1,7 +1,10 @@
 import axios from 'axios';
 
+// Use environment variable for API URL, fallback to localhost for development
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api/';
+
 const API = axios.create({
-  baseURL: 'http://localhost:8000/api/',
+  baseURL: API_BASE_URL,
 });
 
 // Automatically attach JWT token to every request if it exists
@@ -26,7 +29,7 @@ API.interceptors.response.use(
       try {
         const refreshToken = localStorage.getItem('refresh');
         if (refreshToken) {
-          const response = await axios.post('http://localhost:8000/api/auth/refresh/', {
+          const response = await axios.post(`${API_BASE_URL}auth/refresh/`, {
             refresh: refreshToken
           });
           const { access } = response.data;
@@ -104,4 +107,12 @@ export const getPendingUsers = async () => {
 
 export const approveUser = async (userId, action, role = null) => {
   return await API.post(`admin/approve-user/${userId}/`, { action, role });
+};
+
+export const updateBookingStatus = async (bookingId, status) => {
+  return await API.post(`admin/bookings/${bookingId}/status/`, { status });
+};
+
+export const deleteAllBookings = async () => {
+  return await API.delete('admin/bookings/delete-all/');
 };

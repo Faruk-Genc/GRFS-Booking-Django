@@ -13,8 +13,13 @@ const BookingForm = () => {
     return roomIdsParam ? roomIdsParam.split(',').map(id => parseInt(id)).filter(id => !isNaN(id)) : [];
   }, [roomIdsParam]);
   
+  // Get booking type from URL params
+  const bookingType = searchParams.get('type') || 'regular';
+  const isCampBooking = bookingType === 'camp';
+  
   // State management
   const [selectedDate, setSelectedDate] = useState('');
+  const [selectedEndDate, setSelectedEndDate] = useState(''); // For camp bookings
   const [availableHours, setAvailableHours] = useState([]);
   const [unavailableSlots, setUnavailableSlots] = useState([]);
   const [startTime, setStartTime] = useState('');
@@ -46,15 +51,15 @@ const BookingForm = () => {
     }
   }, [selectedDate, roomIds]);
 
-  // Fetch availability when date is selected
+  // Fetch availability when date is selected (only for regular bookings)
   useEffect(() => {
-    if (selectedDate && roomIds.length > 0) {
+    if (!isCampBooking && selectedDate && roomIds.length > 0) {
       fetchAvailability();
     } else {
       setAvailableHours([]);
       setUnavailableSlots([]);
     }
-  }, [selectedDate, roomIds, fetchAvailability]);
+  }, [selectedDate, roomIds, fetchAvailability, isCampBooking]);
 
   // Format hour
   const formatHour = (hour) => {
@@ -78,8 +83,17 @@ const BookingForm = () => {
 
   const handleDateChange = (e) => {
     setSelectedDate(e.target.value);
+    if (isCampBooking) {
+      // For camp bookings, set end date to same as start date initially
+      setSelectedEndDate(e.target.value);
+    }
     setStartTime('');
     setEndTime('');
+    setConflictDetails(null);
+  };
+
+  const handleEndDateChange = (e) => {
+    setSelectedEndDate(e.target.value);
     setConflictDetails(null);
   };
 
@@ -119,14 +133,38 @@ const BookingForm = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!selectedDate || !startTime || !endTime) {
-      setError('Please select a date, start time, and end time');
-      return;
-    }
+    if (isCampBooking) {
+      // Camp booking validation
+      if (!selectedDate || !selectedEndDate || !startTime || !endTime) {
+        setError('Please select start date, end date, start time, and end time');
+        return;
+      }
+      
+      // For camp bookings, validate dates
+      const startDateObj = new Date(selectedDate);
+      const endDateObj = new Date(selectedEndDate);
+      
+      if (endDateObj < startDateObj) {
+        setError('End date must be on or after start date');
+        return;
+      }
+      
+      // If same day, validate times
+      if (selectedDate === selectedEndDate && parseInt(startTime) >= parseInt(endTime)) {
+        setError('End time must be after start time');
+        return;
+      }
+    } else {
+      // Regular booking validation
+      if (!selectedDate || !startTime || !endTime) {
+        setError('Please select a date, start time, and end time');
+        return;
+      }
 
-    if (parseInt(startTime) >= parseInt(endTime)) {
-      setError('End time must be after start time');
-      return;
+      if (parseInt(startTime) >= parseInt(endTime)) {
+        setError('End time must be after start time');
+        return;
+      }
     }
 
     setSubmitting(true);
@@ -139,27 +177,30 @@ const BookingForm = () => {
       let startHour = parseInt(startTime);
       let endHour = parseInt(endTime);
       
+      let startDate = selectedDate;
+      let endDate = isCampBooking ? selectedEndDate : selectedDate;
+      
       // Handle hour 24 (midnight) - convert to next day at 00:00
-      let endDate = selectedDate;
       if (endHour === 24) {
         endHour = 0;
-        // Add one day to the date
-        const date = new Date(selectedDate);
+        // Add one day to the end date
+        const date = new Date(endDate);
         date.setDate(date.getDate() + 1);
         endDate = date.toISOString().split('T')[0];
       }
       
-      const startDatetime = `${selectedDate}T${String(startHour).padStart(2, '0')}:00:00`;
+      const startDatetime = `${startDate}T${String(startHour).padStart(2, '0')}:00:00`;
       const endDatetime = `${endDate}T${String(endHour).padStart(2, '0')}:00:00`;
 
       const response = await createBooking({
         room_ids: roomIds,
         start_datetime: startDatetime,
         end_datetime: endDatetime,
+        booking_type: isCampBooking ? 'camp' : 'regular',
       });
 
       // Success - navigate to success page or dashboard
-      alert('Booking created successfully!');
+      alert(isCampBooking ? 'Camp booking created successfully! It will be reviewed by an admin.' : 'Booking created successfully!');
       navigate('/bookingpage');
     } catch (err) {
       if (err.response?.status === 409) {
@@ -249,9 +290,21 @@ const BookingForm = () => {
 
       {roomIds.length > 0 && (
         <form onSubmit={handleSubmit} className="booking-form">
+          {isCampBooking && (
+            <div className="camp-booking-notice" style={{ 
+              backgroundColor: '#e8edf5', 
+              padding: '15px', 
+              borderRadius: '5px', 
+              marginBottom: '20px',
+              border: '2px solid #1a3970'
+            }}>
+              <strong>Camp Booking:</strong> This booking will require admin approval. You can select different start and end dates.
+            </div>
+          )}
+          
           {/* Date Selection */}
           <div className="form-group">
-            <label htmlFor="date">Select Date *</label>
+            <label htmlFor="date">{isCampBooking ? 'Start Date *' : 'Select Date *'}</label>
             <input
               type="date"
               id="date"
@@ -266,13 +319,32 @@ const BookingForm = () => {
             />
           </div>
 
-          {/* Loading State */}
-          {loading && selectedDate && (
+          {/* End Date Selection for Camp Bookings */}
+          {isCampBooking && (
+            <div className="form-group">
+              <label htmlFor="endDate">End Date *</label>
+              <input
+                type="date"
+                id="endDate"
+                value={selectedEndDate}
+                onChange={handleEndDateChange}
+                onKeyDown={handleDateKeyDown}
+                onKeyPress={(e) => e.preventDefault()}
+                min={selectedDate || today}
+                required
+                className="form-input date-input"
+                onClick={handleDateInputClick}
+              />
+            </div>
+          )}
+
+          {/* Loading State - only show for regular bookings */}
+          {!isCampBooking && loading && selectedDate && (
             <div className="loading-message">Loading availability...</div>
           )}
 
-          {/* Available Hours Display */}
-          {!loading && selectedDate && availableHours.length > 0 && (
+          {/* Available Hours Display - only for regular bookings */}
+          {!isCampBooking && !loading && selectedDate && availableHours.length > 0 && (
             <div className="availability-info">
               <h3>Available Hours for {new Date(selectedDate).toLocaleDateString()}</h3>
               <div className="available-hours">
@@ -285,8 +357,8 @@ const BookingForm = () => {
             </div>
           )}
 
-          {/* Unavailable Slots Display */}
-          {!loading && selectedDate && unavailableSlots.length > 0 && (
+          {/* Unavailable Slots Display - only for regular bookings */}
+          {!isCampBooking && !loading && selectedDate && unavailableSlots.length > 0 && (
             <div className="unavailable-info">
               <h4>Unavailable Time Slots:</h4>
               <ul>
@@ -310,52 +382,86 @@ const BookingForm = () => {
             </div>
           )}
 
-          {/* No Availability Message */}
-          {!loading && selectedDate && availableHours.length === 0 && unavailableSlots.length > 0 && (
+          {/* No Availability Message - only for regular bookings */}
+          {!isCampBooking && !loading && selectedDate && availableHours.length === 0 && unavailableSlots.length > 0 && (
             <div className="no-availability">
               <p>No available hours for the selected date. Please choose another date.</p>
             </div>
           )}
 
           {/* Start Time Selection */}
-          {selectedDate && availableHours.length > 0 && (
+          {selectedDate && (isCampBooking || availableHours.length > 0) && (
             <div className="form-group">
               <label htmlFor="startTime">Start Time *</label>
-              <select
-                id="startTime"
-                value={startTime}
-                onChange={handleStartTimeChange}
-                required
-                className="form-input"
-              >
-                <option value="">Select start time</option>
-                {timeOptions.map(opt => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
+              {isCampBooking ? (
+                <select
+                  id="startTime"
+                  value={startTime}
+                  onChange={handleStartTimeChange}
+                  required
+                  className="form-input"
+                >
+                  <option value="">Select start time</option>
+                  {Array.from({ length: 24 }, (_, i) => i).map(hour => (
+                    <option key={hour} value={hour}>
+                      {formatHour(hour)}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <select
+                  id="startTime"
+                  value={startTime}
+                  onChange={handleStartTimeChange}
+                  required
+                  className="form-input"
+                >
+                  <option value="">Select start time</option>
+                  {timeOptions.map(opt => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
           )}
 
           {/* End Time Selection */}
-          {startTime && (
+          {startTime && (isCampBooking || true) && (
             <div className="form-group">
               <label htmlFor="endTime">End Time *</label>
-              <select
-                id="endTime"
-                value={endTime}
-                onChange={handleEndTimeChange}
-                required
-                className="form-input"
-              >
-                <option value="">Select end time</option>
-                {endTimeOptions.map(opt => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
+              {isCampBooking ? (
+                <select
+                  id="endTime"
+                  value={endTime}
+                  onChange={handleEndTimeChange}
+                  required
+                  className="form-input"
+                >
+                  <option value="">Select end time</option>
+                  {Array.from({ length: 24 }, (_, i) => i).map(hour => (
+                    <option key={hour} value={hour}>
+                      {formatHour(hour)}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <select
+                  id="endTime"
+                  value={endTime}
+                  onChange={handleEndTimeChange}
+                  required
+                  className="form-input"
+                >
+                  <option value="">Select end time</option>
+                  {endTimeOptions.map(opt => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
           )}
 
@@ -394,10 +500,10 @@ const BookingForm = () => {
             </button>
             <button
               type="submit"
-              disabled={submitting || !selectedDate || !startTime || !endTime}
+              disabled={submitting || !selectedDate || !startTime || !endTime || (isCampBooking && !selectedEndDate)}
               className="btn-primary"
             >
-              {submitting ? 'Creating Booking...' : 'Confirm Booking'}
+              {submitting ? 'Creating Booking...' : isCampBooking ? 'Submit Camp Booking' : 'Confirm Booking'}
             </button>
           </div>
         </form>

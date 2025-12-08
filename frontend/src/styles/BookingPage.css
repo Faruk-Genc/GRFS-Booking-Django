@@ -20,6 +20,14 @@ h2 {
   color: #333;
 }
 
+h4 {
+  margin: 0;
+  flex: 1;
+  color: gray;
+  text-align: center;
+  font-size: 15px;
+}
+
 /* Accordion Styles */
 .accordion {
   margin-top: 20px;
@@ -44,6 +52,10 @@ h2 {
   justify-content: space-between;
   align-items: center;
   border-radius: 5px;
+}
+
+.floor-header h3 {
+  margin: 0;
 }
 
 .floor-header:hover {
@@ -113,9 +125,16 @@ h2 {
   flex-grow: 1;
 }
 
+/* Floor Header Buttons Container */
+.floor-header-buttons {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
 /* Book Entire Floor Button */
 .book-floor-btn {
-  background-color: #1a3970;
+  background-color: #d40000;
   color: #ffffff;
   padding: 10px 20px;
   border: none;
@@ -127,6 +146,23 @@ h2 {
 }
 
 .book-floor-btn:hover {
+  background-color: #0f2447;
+}
+
+/* Book for Camp Button */
+.book-camp-btn {
+  background-color: #d40000;
+  color: #ffffff;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.book-camp-btn:hover {
   background-color: #0f2447;
 }
 
@@ -153,6 +189,8 @@ input[type='checkbox'] {
     padding: 12px;
   }
 
+  
+
   .room-item {
     font-size: 14px;
     padding: 8px 12px;
@@ -162,6 +200,12 @@ input[type='checkbox'] {
     font-size: 14px;
     padding: 8px 15px;
   }
+
+
+}
+
+
+
 
 /* Booking Form Button */
 .booking-form-btn {
@@ -173,7 +217,7 @@ input[type='checkbox'] {
   font-size: 18px;
   font-weight: 600;
   color: #ffffff;
-  background-color: #1a3970;
+  background-color: #d40000;
   border: none;
   border-radius: 8px;
   cursor: pointer;
@@ -206,8 +250,6 @@ input[type='checkbox'] {
     width: 18px;
     height: 18px;
   }
-}
-
 /* Booking Form Styles */
 .booking-form-container {
   max-width: 800px;

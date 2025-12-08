@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getFloors, getRooms } from '../../services/api';
+import { getFloors, getRooms, getUser } from '../../services/api';
 import '../../styles/BookingPage.css';
 
 const BookingPage = () => {
@@ -12,6 +12,21 @@ const BookingPage = () => {
   const [selectedFloors, setSelectedFloors] = useState([]); // Track selected floors
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    // Fetch user data to check role
+    const fetchUserData = async () => {
+      try {
+        const response = await getUser();
+        setUser(response.data);
+      } catch (err) {
+        // User not logged in or token expired - handled by PrivateRoute
+        setUser(null);
+      }
+    };
+    fetchUserData();
+  }, []);
 
   useEffect(() => {
     // Fetch floors data from your API
@@ -100,6 +115,37 @@ const BookingPage = () => {
     }
   };
 
+  const handleCampBooking = async (floorId) => {
+    // Check if user has permission to book camps
+    if (!user || !['mentor', 'coordinator', 'admin'].includes(user.role)) {
+      alert('Only mentors, coordinators, and admins can book camps.');
+      return;
+    }
+
+    // Ensure rooms are fetched before trying to select them
+    let rooms = fetchedRooms[floorId];
+    
+    if (!rooms || !Array.isArray(rooms)) {
+      // Fetch rooms for this floor first if not already fetched
+      rooms = await fetchRooms(floorId);
+    }
+    
+    // Only proceed if we have valid rooms
+    if (rooms && Array.isArray(rooms) && rooms.length > 0) {
+      const roomsForFloor = rooms.map((room) => room.id);
+      // Navigate directly to booking form with camp type and all downstairs rooms
+      navigate(`/booking-form?rooms=${roomsForFloor.join(',')}&type=camp`);
+    } else {
+      setError('Unable to fetch rooms for this floor. Please try again.');
+    }
+  };
+
+  // Helper function to check if a floor is downstairs
+  const isDownstairsFloor = (floor) => {
+    const name = floor.name.toLowerCase();
+    return name.includes('downstairs') || name.includes('first') || name.includes('ground') || name === '1' || name === 'floor 1';
+  };
+
   return (
     <div className="container">
       <h2>Building Rooms</h2>
@@ -121,9 +167,29 @@ const BookingPage = () => {
               onClick={(e) => toggleFloor(floor.id, e)} // Pass the event to prevent collapsing
             >
               <h3>{floor.name}</h3>
-              <button className="book-floor-btn" onClick={() => handleFloorBooking(floor.id)}>
-                Book Entire Floor
-              </button>
+              <h4>click to display rooms</h4>
+              <div className="floor-header-buttons">
+                {isDownstairsFloor(floor) && user && ['mentor', 'coordinator', 'admin'].includes(user.role) && (
+                  <button 
+                    className="book-camp-btn" 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleCampBooking(floor.id);
+                    }}
+                  >
+                    Book for Camp
+                  </button>
+                )}
+                <button 
+                  className="book-floor-btn" 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleFloorBooking(floor.id);
+                  }}
+                >
+                  Select Entire Floor
+                </button>
+              </div>
             </div>
 
             {activeFloors[floor.id] && (

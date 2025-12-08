@@ -22,6 +22,51 @@
     font-family: inherit;
   }
   
+  .password-input-wrapper {
+    position: relative;
+    width: 100%;
+    margin: 10px 0;
+  }
+  
+  .password-input-wrapper input {
+    width: 100%;
+    padding-right: 45px;
+    margin: 0;
+  }
+  
+  .password-toggle-btn {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 5px 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #666;
+    transition: color 0.2s ease;
+    z-index: 10;
+  }
+  
+  .password-toggle-btn:hover {
+    color: #1a3970;
+  }
+  
+  .password-toggle-btn:focus {
+    outline: 2px solid #1a3970;
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+  
+  .password-toggle-btn svg {
+    width: 20px;
+    height: 20px;
+    display: block;
+  }
+  
   .register-container input:focus {
     outline: none;
     border-color: #1a3970;
@@ -48,18 +93,19 @@
     border-color: #1a3970;
     box-shadow: 0 0 0 2px rgba(26, 57, 112, 0.2);
   }
-  .register-container button {
+  .register-container button[type="submit"] {
     width: 100%;
     padding: 12px;
-    background-color: #70bd85;
-    color: white;
+    background-color: #1a3970;
+    color: #ffffff;
     border: none;
     border-radius: 4px;
     font-size: 16px;
     cursor: pointer;
+    margin-top: 10px;
   }
-  .register-container button:hover {
-    background-color: #437e51;
+  .register-container button[type="submit"]:hover {
+    background-color: #0f2447;
   }
   .success-message {
     color: green;

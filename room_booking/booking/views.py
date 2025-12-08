@@ -3,6 +3,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions, generics
 from rest_framework import serializers
+from rest_framework.exceptions import AuthenticationFailed
 from .models import Booking, Room, Floor
 from .serializers import *
 from django.contrib.auth import get_user_model
@@ -107,6 +108,18 @@ class CreateBookingView(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
+            # Get booking type (default to 'regular')
+            booking_type = request.data.get('booking_type', 'regular')
+            
+            # Check permissions for camp bookings
+            if booking_type == 'camp':
+                user_role = request.user.role
+                if user_role not in ['mentor', 'coordinator', 'admin']:
+                    return Response(
+                        {"detail": "Only mentors, coordinators, and admins can book camps."}, 
+                        status=status.HTTP_403_FORBIDDEN
+                    )
+            
             # Validate datetime fields
             start_datetime_str = request.data.get("start_datetime")
             end_datetime_str = request.data.get("end_datetime")
@@ -175,25 +188,28 @@ class CreateBookingView(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
-            # Validate maximum booking duration (e.g., 8 hours)
-            max_duration = timedelta(hours=8)
-            if (end_datetime - start_datetime) > max_duration:
-                return Response(
-                    {"detail": "Booking duration cannot exceed 8 hours."}, 
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            
-            # Validate minimum booking duration (e.g., 1 hour)
-            min_duration = timedelta(hours=1)
-            if (end_datetime - start_datetime) < min_duration:
-                return Response(
-                    {"detail": "Booking duration must be at least 1 hour."}, 
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+            # For camp bookings, skip duration validation (they can span multiple days)
+            if booking_type != 'camp':
+                # Validate maximum booking duration (e.g., 8 hours) for regular bookings
+                max_duration = timedelta(hours=8)
+                if (end_datetime - start_datetime) > max_duration:
+                    return Response(
+                        {"detail": "Booking duration cannot exceed 8 hours."}, 
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                
+                # Validate minimum booking duration (e.g., 1 hour) for regular bookings
+                min_duration = timedelta(hours=1)
+                if (end_datetime - start_datetime) < min_duration:
+                    return Response(
+                        {"detail": "Booking duration must be at least 1 hour."}, 
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
 
             # Check for booking conflicts - use database transaction to prevent race conditions
             from django.db import transaction
             with transaction.atomic():
+                # Check for conflicts (works for both regular and camp bookings)
                 conflicts = check_booking_conflicts(room_ids, start_datetime, end_datetime)
                 if conflicts:
                     # Format conflict details for user-friendly error message
@@ -219,18 +235,26 @@ class CreateBookingView(APIView):
                         status=status.HTTP_409_CONFLICT
                     )
 
-                # Create the booking with the selected rooms
-                # Pass datetime objects directly (serializer will handle them)
-                # Status will be auto-determined in the serializer based on duration and room count
+                # Create the booking (single booking for both regular and camp bookings)
+                # For camp bookings, this will be one booking covering the entire time period
                 booking_data = {
                     "room_ids": room_ids,
                     "start_datetime": start_datetime,
                     "end_datetime": end_datetime,
+                    "booking_type": booking_type,
                 }
 
                 serializer = BookingSerializer(data=booking_data, context={'request': request})
                 if serializer.is_valid():
                     booking = serializer.save()  # Create booking
+                    
+                    # Send booking creation email
+                    try:
+                        from .email_utils import send_booking_creation_email
+                        send_booking_creation_email(booking)
+                    except Exception as e:
+                        logger.error(f"Failed to send booking creation email: {str(e)}")
+                    
                     return Response(serializer.data, status=status.HTTP_201_CREATED)
                 return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         except (ValueError, TypeError, AttributeError) as e:
@@ -483,9 +507,24 @@ class BookingDetailView(APIView):
                         status=status.HTTP_409_CONFLICT
                     )
             
+            # Store old data for email notification
+            old_data = {
+                'start_datetime': booking.start_datetime,
+                'end_datetime': booking.end_datetime,
+                'status': booking.status,
+            }
+            
             serializer = BookingSerializer(booking, data=data, partial=True, context={'request': request})
             if serializer.is_valid():
-                serializer.save()
+                updated_booking = serializer.save()
+                
+                # Send booking update email
+                try:
+                    from .email_utils import send_booking_update_email
+                    send_booking_update_email(updated_booking, updated_by_admin=False, old_data=old_data)
+                except Exception as e:
+                    logger.error(f"Failed to send booking update email: {str(e)}")
+                
                 return Response(serializer.data, status=status.HTTP_200_OK)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
             
@@ -514,6 +553,13 @@ class BookingDetailView(APIView):
             # Instead of deleting, mark as cancelled
             booking.status = 'Cancelled'
             booking.save()
+            
+            # Send booking cancellation email
+            try:
+                from .email_utils import send_booking_cancellation_email
+                send_booking_cancellation_email(booking, cancelled_by_admin=False)
+            except Exception as e:
+                logger.error(f"Failed to send booking cancellation email: {str(e)}")
             
             return Response(
                 {"detail": "Booking cancelled successfully."}, 
@@ -546,12 +592,12 @@ class LoginSerializer(TokenObtainPairSerializer):
         
         # Check if user is approved
         if user.approval_status == 'pending':
-            raise serializers.ValidationError(
-                {"detail": "Your account is pending approval. Please wait for an admin to approve your account."}
+            raise AuthenticationFailed(
+                "Your account is pending approval. Please wait for an admin to approve your account."
             )
         elif user.approval_status == 'denied':
-            raise serializers.ValidationError(
-                {"detail": "Your account has been denied. Please contact an administrator."}
+            raise AuthenticationFailed(
+                "Your account has been denied. Please contact an administrator."
             )
         
         return data
@@ -653,8 +699,9 @@ class CheckAvailabilityView(APIView):
                     start_est = booking.start_datetime.astimezone(est)
                     end_est = booking.end_datetime.astimezone(est)
                     
-                    # Only include if booking is on the selected date
-                    if start_est.date() == check_date or end_est.date() == check_date:
+                    # Include booking if it overlaps with the check_date
+                    # This handles bookings that start before, end after, or span the check_date
+                    if start_est.date() <= check_date <= end_est.date():
                         # Use prefetched rooms instead of querying
                         for room in booking.rooms.all():
                             if room.id in room_ids:
@@ -667,13 +714,21 @@ class CheckAvailabilityView(APIView):
                                     'end_est': end_est,
                                 })
             
-            # Remove duplicates and format for response
+            # Remove duplicates and create separate lists for calculation and response
             seen_bookings = set()
+            booking_slots_for_calculation = []  # Keep datetime objects for hour checking
             for booking_info in bookings_list:
                 # Create a unique key for each booking
                 key = (booking_info['room_id'], booking_info['start_datetime'], booking_info['end_datetime'])
                 if key not in seen_bookings:
                     seen_bookings.add(key)
+                    # Store for hour calculation (with datetime objects)
+                    booking_slots_for_calculation.append({
+                        'room_id': booking_info['room_id'],
+                        'start_est': booking_info['start_est'],
+                        'end_est': booking_info['end_est'],
+                    })
+                    # Store for response (without datetime objects, only strings)
                     unavailable_slots.append({
                         'room_id': booking_info['room_id'],
                         'room_name': booking_info['room_name'],
@@ -689,14 +744,25 @@ class CheckAvailabilityView(APIView):
             available_hours = []
             for hour in all_hours:
                 # Check if this hour is available for all requested rooms
-                unavailable_for_rooms = []
-                for slot in unavailable_slots:
-                    # Check if hour falls within the booking time range
-                    if slot['start_hour'] <= hour < slot['end_hour']:
-                        unavailable_for_rooms.append(slot)
+                unavailable_for_rooms = set()
                 
+                for slot in booking_slots_for_calculation:
+                    slot_start_est = slot['start_est']
+                    slot_end_est = slot['end_est']
+                    slot_room_id = slot['room_id']
+                    
+                    # Create datetime for this hour on the check_date
+                    hour_datetime = est.localize(datetime.combine(check_date, datetime.min.time().replace(hour=hour)))
+                    hour_end_datetime = hour_datetime + timedelta(hours=1)
+                    
+                    # Check if this hour overlaps with the booking
+                    # A booking blocks an hour if the booking overlaps with that hour slot
+                    # This properly handles camp bookings that span multiple days
+                    if slot_start_est < hour_end_datetime and slot_end_est > hour_datetime:
+                        unavailable_for_rooms.add(slot_room_id)
+                
+                # An hour is available if at least one requested room is not unavailable
                 if len(unavailable_for_rooms) < len(room_ids):
-                    # At least one room is available at this hour
                     available_hours.append(hour)
             
             return Response({
@@ -768,6 +834,14 @@ class ApproveUserView(APIView):
                 if new_role and new_role in [choice[0] for choice in User.ROLE_CHOICES]:
                     user.role = new_role
                 user.save()
+                
+                # Send approval email
+                try:
+                    from .email_utils import send_account_approval_email
+                    send_account_approval_email(user, approved=True)
+                except Exception as e:
+                    logger.error(f"Failed to send account approval email: {str(e)}")
+                
                 serializer = UserSerializer(user)
                 return Response(
                     {"detail": "User approved successfully.", "user": serializer.data}, 
@@ -776,6 +850,14 @@ class ApproveUserView(APIView):
             elif action == 'deny':
                 user.approval_status = 'denied'
                 user.save()
+                
+                # Send denial email
+                try:
+                    from .email_utils import send_account_approval_email
+                    send_account_approval_email(user, approved=False)
+                except Exception as e:
+                    logger.error(f"Failed to send account denial email: {str(e)}")
+                
                 serializer = UserSerializer(user)
                 return Response(
                     {"detail": "User denied successfully.", "user": serializer.data}, 
@@ -790,5 +872,94 @@ class ApproveUserView(APIView):
             logger.error(f"Error processing user approval: {str(e)}", exc_info=True)
             return Response(
                 {"detail": "An error occurred while processing the request."}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+class UpdateBookingStatusView(APIView):
+    """View to update booking status - Admin only"""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def post(self, request, booking_id):
+        try:
+            # Only admins can update booking status
+            if request.user.role != 'admin':
+                return Response(
+                    {"detail": "You do not have permission to update booking status."}, 
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            booking = get_object_or_404(Booking, id=booking_id)
+            new_status = request.data.get('status')
+            
+            # Validate status
+            valid_statuses = ['Pending', 'Approved', 'Cancelled']
+            if new_status not in valid_statuses:
+                return Response(
+                    {"detail": f"Invalid status. Must be one of: {', '.join(valid_statuses)}"}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Store old status for email notification
+            old_status = booking.status
+            
+            # Update status
+            booking.status = new_status
+            booking.save()
+            
+            # Send email notification based on status change
+            try:
+                from .email_utils import send_booking_update_email, send_booking_cancellation_email
+                if new_status == 'Cancelled':
+                    send_booking_cancellation_email(booking, cancelled_by_admin=True)
+                else:
+                    old_data = {
+                        'start_datetime': booking.start_datetime,
+                        'end_datetime': booking.end_datetime,
+                        'status': old_status,
+                    }
+                    send_booking_update_email(booking, updated_by_admin=True, old_data=old_data)
+            except Exception as e:
+                logger.error(f"Failed to send booking status update email: {str(e)}")
+            
+            # Return updated booking
+            serializer = BookingSerializer(booking)
+            return Response(
+                {"detail": f"Booking status updated to {new_status}.", "booking": serializer.data}, 
+                status=status.HTTP_200_OK
+            )
+        except Exception as e:
+            logger.error(f"Error updating booking status: {str(e)}", exc_info=True)
+            return Response(
+                {"detail": "An error occurred while updating booking status."}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+class DeleteAllBookingsView(APIView):
+    """View to delete all bookings - Admin only"""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def delete(self, request):
+        try:
+            # Only admins can delete all bookings
+            if request.user.role != 'admin':
+                return Response(
+                    {"detail": "You do not have permission to delete all bookings."}, 
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            # Get count before deletion
+            booking_count = Booking.objects.count()
+            
+            # Delete all bookings
+            Booking.objects.all().delete()
+            
+            return Response(
+                {"detail": f"Successfully deleted {booking_count} booking(s)."}, 
+                status=status.HTTP_200_OK
+            )
+        except Exception as e:
+            logger.error(f"Error deleting all bookings: {str(e)}", exc_info=True)
+            return Response(
+                {"detail": "An error occurred while deleting all bookings."}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )

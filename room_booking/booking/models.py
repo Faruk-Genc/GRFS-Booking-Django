@@ -71,6 +71,16 @@ class Booking(models.Model):
         default="Pending",
         db_index=True,  # Add index for faster filtering
     )
+    BOOKING_TYPE_CHOICES = [
+        ('regular', 'Regular'),
+        ('camp', 'Camp'),
+    ]
+    booking_type = models.CharField(
+        max_length=20,
+        choices=BOOKING_TYPE_CHOICES,
+        default='regular',
+        db_index=True,
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

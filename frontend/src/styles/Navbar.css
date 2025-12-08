@@ -44,9 +44,7 @@
   transition: color 0.3s ease;
 }
 
-.navbar-brand:hover .navbar-brand-text {
-  color: #d40000;
-}
+
 
 .navbar-menu {
   display: flex;

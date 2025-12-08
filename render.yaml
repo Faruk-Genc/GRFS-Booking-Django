@@ -1,0 +1,69 @@
+services:
+  # Django Backend Service
+  - type: web
+    name: grfs-booking-backend
+    env: python
+    plan: starter
+    buildCommand: |
+      pip install -r room_booking/requirements.txt &&
+      cd room_booking &&
+      python manage.py collectstatic --noinput
+    startCommand: cd room_booking && gunicorn room_booking.wsgi:application
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.0
+      - key: SECRET_KEY
+        sync: false
+      - key: DEBUG
+        value: False
+      - key: ALLOWED_HOSTS
+        sync: false
+      - key: DB_ENGINE
+        value: postgresql
+      - key: DB_NAME
+        fromDatabase:
+          name: grfs-booking-db
+          property: database
+      - key: DB_USER
+        fromDatabase:
+          name: grfs-booking-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: grfs-booking-db
+          property: password
+      - key: DB_HOST
+        fromDatabase:
+          name: grfs-booking-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: grfs-booking-db
+          property: port
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+      - key: EMAIL_BACKEND
+        value: django.core.mail.backends.smtp.EmailBackend
+      - key: EMAIL_HOST
+        sync: false
+      - key: EMAIL_PORT
+        value: 587
+      - key: EMAIL_USE_TLS
+        value: True
+      - key: EMAIL_USE_SSL
+        value: False
+      - key: EMAIL_HOST_USER
+        sync: false
+      - key: EMAIL_HOST_PASSWORD
+        sync: false
+      - key: DEFAULT_FROM_EMAIL
+        sync: false
+      - key: SITE_URL
+        sync: false
+
+databases:
+  - name: grfs-booking-db
+    plan: starter
+    databaseName: grfs_booking
+    user: grfs_admin
+

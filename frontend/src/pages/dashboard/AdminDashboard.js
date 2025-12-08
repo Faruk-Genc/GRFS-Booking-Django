@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { getAllBookings, getRooms, deleteBooking, updateBooking, checkAvailability, getPendingUsers, approveUser } from '../../services/api';
+import { getAllBookings, getRooms, deleteBooking, updateBooking, checkAvailability, getPendingUsers, approveUser, updateBookingStatus, deleteAllBookings } from '../../services/api';
 import '../../styles/AdminDashboard.css';
 
 const AdminDashboard = () => {
@@ -68,6 +68,33 @@ const AdminDashboard = () => {
       alert(action === 'approve' ? 'User approved successfully!' : 'User denied successfully!');
     } catch (err) {
       alert(err.response?.data?.detail || `Failed to ${action} user`);
+    }
+  };
+
+  const handleDeleteAllBookings = async () => {
+    const bookingCount = bookings.length;
+    if (bookingCount === 0) {
+      alert('There are no bookings to delete.');
+      return;
+    }
+
+    const confirmMessage = `Are you sure you want to delete ALL ${bookingCount} booking(s)?\n\nThis action cannot be undone!`;
+    if (!window.confirm(confirmMessage)) {
+      return;
+    }
+
+    // Double confirmation for safety
+    if (!window.confirm('This will permanently delete ALL bookings. Are you absolutely sure?')) {
+      return;
+    }
+
+    try {
+      await deleteAllBookings();
+      // Clear all bookings from state
+      setBookings([]);
+      alert(`Successfully deleted ${bookingCount} booking(s).`);
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Failed to delete all bookings');
     }
   };
 
@@ -381,7 +408,6 @@ const AdminDashboard = () => {
     if (!selectedBooking) return;
 
     try {
-      // Try to update status - if serializer doesn't allow it, we'll handle the error
       // For cancelled status, we can use the delete endpoint which sets status to Cancelled
       if (newStatus === 'Cancelled') {
         await deleteBooking(selectedBooking.id);
@@ -391,36 +417,31 @@ const AdminDashboard = () => {
         return;
       }
 
-      // For other status changes, try updating with status field
-      // Note: The serializer marks status as read-only, so this might not work
-      // If it fails, we'll need a backend endpoint for admin status updates
-      try {
-        await updateBooking(selectedBooking.id, {
-          status: newStatus,
-          room_ids: selectedBooking.rooms.map(r => r.id),
-          start_datetime: selectedBooking.start_datetime,
-          end_datetime: selectedBooking.end_datetime
-        });
-      } catch (updateErr) {
-        // If status update fails, try without status (just to refresh data)
-        // This is a workaround - ideally we'd have an admin endpoint for status updates
-        console.warn('Status update may not be supported by API:', updateErr);
-        // Still update locally for better UX
+      // Use the admin endpoint to update booking status
+      const response = await updateBookingStatus(selectedBooking.id, newStatus);
+      
+      // Update booking in list with the response data
+      const updatedBooking = response.data.booking || response.data;
+      
+      // Ensure status is properly formatted (capitalized)
+      if (updatedBooking.status) {
+        updatedBooking.status = updatedBooking.status.charAt(0).toUpperCase() + updatedBooking.status.slice(1).toLowerCase();
+        // Handle "Cancelled" specifically
+        if (updatedBooking.status.toLowerCase() === 'cancelled') {
+          updatedBooking.status = 'Cancelled';
+        }
       }
       
-      // Update booking in list
       setBookings(prevBookings => 
         prevBookings.map(b => 
           b.id === selectedBooking.id 
-            ? { ...b, status: newStatus }
+            ? { ...b, ...updatedBooking }
             : b
         )
       );
       
-      setSelectedBooking({ ...selectedBooking, status: newStatus });
-      
-      // Refresh bookings to get latest data
-      await fetchBookings();
+      // Update selected booking to reflect the change
+      setSelectedBooking({ ...selectedBooking, ...updatedBooking });
     } catch (err) {
       alert(err.response?.data?.detail || 'Failed to update booking status');
     }
@@ -647,13 +668,31 @@ const AdminDashboard = () => {
           )}
         </div>
         <div className="header-top">
-          <button 
-            className={`view-btn ${showPendingUsers ? 'active' : ''}`}
-            onClick={() => setShowPendingUsers(!showPendingUsers)}
-            style={{ marginRight: '10px' }}
-          >
-            {showPendingUsers ? 'Hide' : 'Show'} Pending Users ({pendingUsers.length})
-          </button>
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            <button 
+              className={`view-btn ${showPendingUsers ? 'active' : ''}`}
+              onClick={() => setShowPendingUsers(!showPendingUsers)}
+            >
+              {showPendingUsers ? 'Hide' : 'Show'} Pending Users ({pendingUsers.length})
+            </button>
+            <button 
+              className="delete-all-btn"
+              onClick={handleDeleteAllBookings}
+              style={{
+                padding: '10px 20px',
+                backgroundColor: '#d40000',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: '600',
+                transition: 'background-color 0.3s ease'
+              }}
+            >
+              Delete All Bookings
+            </button>
+          </div>
           <div className="view-controls">
             <button 
               className={`view-btn ${viewMode === 'day' ? 'active' : ''}`}
