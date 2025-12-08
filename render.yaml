@@ -3,7 +3,7 @@ services:
   - type: web
     name: grfs-booking-backend
     env: python
-    plan: starter
+    plan: free
     buildCommand: |
       pip install -r room_booking/requirements.txt &&
       cd room_booking &&
