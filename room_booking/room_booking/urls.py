@@ -29,8 +29,9 @@ urlpatterns = [
 # This allows React Router to handle client-side routing
 if not settings.DEBUG:
     urlpatterns += [
+        path('', TemplateView.as_view(template_name='index.html')),
         re_path(r'^(?!api/|admin/|static/|media/).*$', TemplateView.as_view(template_name='index.html')),
     ]
 else:
-    # In development, serve media files
+    # Development: serve media if you're testing uploads
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

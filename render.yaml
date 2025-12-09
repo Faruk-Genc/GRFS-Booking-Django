@@ -9,6 +9,7 @@ services:
       echo "Starting build process..."
       pwd
       ls -la
+
       echo "Checking for frontend directory..."
       if [ ! -d "frontend" ]; then
         echo "ERROR: frontend directory not found in current directory"
@@ -16,6 +17,7 @@ services:
         ls -la
         exit 1
       fi
+
       cd frontend
       echo "Frontend directory found, checking package.json..."
       if [ ! -f "package.json" ]; then
@@ -24,28 +26,38 @@ services:
         ls -la
         exit 1
       fi
+
       echo "Installing npm dependencies..."
       npm install
+
       echo "Building React app..."
       CI=false REACT_APP_API_URL=/api/ npm run build
       cd ..
+
       echo "Creating directories for static files..."
-      mkdir -p room_booking/staticfiles/static
+      # IMPORTANT: STATIC_ROOT should be the direct target (no extra /static folder)
+      mkdir -p room_booking/staticfiles
       mkdir -p room_booking/booking/templates
+
       echo "Copying React build files..."
       if [ ! -d "frontend/build/static" ] || [ ! -f "frontend/build/index.html" ]; then
         echo "ERROR: React build output missing. React build likely failed."
         exit 1
       fi
 
-      cp -r frontend/build/static/* room_booking/staticfiles/static/
+      # Copy React static files directly into STATIC_ROOT
+      cp -r frontend/build/static/* room_booking/staticfiles/
+
+      # Copy React index.html into Django templates
       cp frontend/build/index.html room_booking/booking/templates/
 
       echo "Installing Python dependencies..."
       pip install -r room_booking/requirements.txt
+
       cd room_booking
       echo "Collecting static files..."
       python manage.py collectstatic --noinput
+
       echo "Build completed successfully!"
     startCommand: cd room_booking && gunicorn room_booking.wsgi:application --bind 0.0.0.0:$PORT
     envVars:
@@ -111,4 +123,3 @@ databases:
     plan: free
     databaseName: grfs_booking
     user: grfs_admin
-
