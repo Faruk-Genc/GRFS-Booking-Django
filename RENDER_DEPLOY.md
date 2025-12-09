@@ -44,8 +44,10 @@ The `build_production.bat` and `build_production.sh` scripts are available for l
 
 **Build Command:**
 ```bash
-pip install -r room_booking/requirements.txt && cd room_booking && python manage.py collectstatic --noinput
+cd frontend && npm install && REACT_APP_API_URL=/api/ npm run build && cd .. && mkdir -p room_booking/staticfiles/static && mkdir -p room_booking/booking/templates && cp -r frontend/build/static/* room_booking/staticfiles/static/ && cp frontend/build/index.html room_booking/booking/templates/ && pip install -r room_booking/requirements.txt && cd room_booking && python manage.py collectstatic --noinput
 ```
+
+**Important:** This builds the React app first, then copies the build files to Django's staticfiles directory, then collects static files.
 
 **Start Command:**
 ```bash
