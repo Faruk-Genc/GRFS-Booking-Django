@@ -12,7 +12,6 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from pathlib import Path
 import os
-import logging
 from dotenv import load_dotenv
 import dj_database_url
 
@@ -212,23 +211,14 @@ if not DEBUG:
         CORS_ALLOWED_ORIGINS = [f"https://{host}" for host in ALLOWED_HOSTS if host]
 
 # Email Configuration
-# Use console backend if email credentials are not configured (prevents registration failures)
-EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
-EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
-
-if not EMAIL_HOST_USER or not EMAIL_HOST_PASSWORD:
-    # Use console backend if email is not configured (emails will be printed to console/logs)
-    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
-    logger = logging.getLogger(__name__)
-    logger.warning("Email credentials not configured. Using console email backend. Emails will be logged to console.")
-else:
-    EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.smtp.EmailBackend')
-
+EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.smtp.EmailBackend')
 EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
 EMAIL_PORT = int(os.getenv('EMAIL_PORT', '587'))
 EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True').lower() == 'true'
 EMAIL_USE_SSL = os.getenv('EMAIL_USE_SSL', 'False').lower() == 'true'
-DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER or 'noreply@grfs-booking.com')
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER)
 SERVER_EMAIL = DEFAULT_FROM_EMAIL
 
 # Site URL for email links (used in email templates)

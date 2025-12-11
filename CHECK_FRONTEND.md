@@ -66,3 +66,5 @@ GRFS-Booking-Django/
 3. Check build logs - should now find `frontend/package.json`
 
 
+
+
