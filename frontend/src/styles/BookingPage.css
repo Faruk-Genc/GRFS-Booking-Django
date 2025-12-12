@@ -134,6 +134,7 @@ h4 {
 
 /* Book Entire Floor Button */
 .book-floor-btn {
+  max-height: 40px;
   background-color: #d40000;
   color: #ffffff;
   padding: 10px 20px;
@@ -151,6 +152,7 @@ h4 {
 
 /* Book for Camp Button */
 .book-camp-btn {
+  max-height: 40px;
   background-color: #d40000;
   color: #ffffff;
   padding: 10px 20px;
