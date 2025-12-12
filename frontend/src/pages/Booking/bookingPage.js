@@ -166,8 +166,10 @@ const BookingPage = () => {
               
               onClick={(e) => toggleFloor(floor.id, e)} // Pass the event to prevent collapsing
             >
-              <h3>{floor.name}</h3>
-              <h4>click to display rooms</h4>
+              <div className="floor-header-text">
+                <h3>{floor.name}</h3>
+                <h4>click to display rooms</h4>
+              </div>
               <div className="floor-header-buttons">
                 {isDownstairsFloor(floor) && user && ['mentor', 'coordinator', 'admin'].includes(user.role) && (
                   <button 

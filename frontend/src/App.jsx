@@ -59,6 +59,7 @@ function App() {
             </PrivateRoute>
           }
         />
+        <Route path="/dev-edit" element={< BookingPage /> } />
       </Routes>
     </Router>
   );
