@@ -4,7 +4,7 @@ REM Production build script for GRFS Booking Django (Windows)
 echo Building React frontend...
 cd frontend
 call npm install
-set REACT_APP_API_URL=/api/
+set VITE_API_URL=/api/
 call npm run build
 
 echo Copying React build to Django static files...

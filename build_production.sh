@@ -4,7 +4,7 @@
 echo "Building React frontend..."
 cd frontend
 npm install
-REACT_APP_API_URL=/api/ npm run build
+VITE_API_URL=/api/ npm run build
 
 echo "Copying React build to Django static files..."
 cd ..
