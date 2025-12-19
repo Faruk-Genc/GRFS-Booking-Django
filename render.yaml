@@ -40,15 +40,15 @@ services:
       mkdir -p room_booking/booking/templates
 
       echo "Copying React build files..."
-      if [ ! -d "frontend/build/static" ] || [ ! -f "frontend/build/index.html" ]; then
-        echo "ERROR: React build output missing. React build likely failed."
-        echo "Checking build directory contents:"
-        ls -la frontend/build/ || echo "Build directory does not exist"
+      if [ ! -f "frontend/build/index.html" ]; then
+        echo "ERROR: React index.html missing. Build failed."
+        ls -la frontend/build/
         exit 1
       fi
 
-      # Copy React static files (Vite configured to output to 'static' directory)
-      cp -r frontend/build/static/* room_booking/staticfiles/
+      # Copy all static assets (everything except index.html)
+      find frontend/build -mindepth 1 -maxdepth 1 ! -name "index.html" -exec cp -r {} room_booking/staticfiles/ \;
+
       
       # Copy other assets (favicon, manifest, robots.txt, etc.)
       if [ -f "frontend/build/favicon.ico" ]; then
