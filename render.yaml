@@ -46,9 +46,13 @@ services:
         exit 1
       fi
 
-      # Copy all static assets (everything except index.html)
-      find frontend/build -mindepth 1 -maxdepth 1 ! -name "index.html" -exec cp -r {} room_booking/staticfiles/ \;
-
+      # Copy static directory contents (Vite outputs to 'static' directory)
+      if [ -d "frontend/build/static" ]; then
+        cp -r frontend/build/static/* room_booking/staticfiles/
+      fi
+      
+      # Copy other files from build root (favicon, manifest, robots.txt, logo, etc.)
+      find frontend/build -maxdepth 1 -type f ! -name "index.html" -exec cp {} room_booking/staticfiles/ \;
       
       # Copy other assets (favicon, manifest, robots.txt, etc.)
       if [ -f "frontend/build/favicon.ico" ]; then
