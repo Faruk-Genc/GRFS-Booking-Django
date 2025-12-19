@@ -40,13 +40,29 @@ services:
       mkdir -p room_booking/booking/templates
 
       echo "Copying React build files..."
-      if [ ! -d "frontend/build/static" ] || [ ! -f "frontend/build/index.html" ]; then
+      if [ ! -d "frontend/build/assets" ] || [ ! -f "frontend/build/index.html" ]; then
         echo "ERROR: React build output missing. React build likely failed."
+        echo "Checking build directory contents:"
+        ls -la frontend/build/ || echo "Build directory does not exist"
         exit 1
       fi
 
-      # Copy React static files directly into STATIC_ROOT
-      cp -r frontend/build/static/* room_booking/staticfiles/
+      # Copy React static files (Vite uses 'assets' instead of 'static')
+      cp -r frontend/build/assets/* room_booking/staticfiles/
+      
+      # Copy other assets (favicon, manifest, robots.txt, etc.)
+      if [ -f "frontend/build/favicon.ico" ]; then
+        cp frontend/build/favicon.ico room_booking/staticfiles/
+      fi
+      if [ -f "frontend/build/manifest.json" ]; then
+        cp frontend/build/manifest.json room_booking/staticfiles/
+      fi
+      if [ -f "frontend/build/robots.txt" ]; then
+        cp frontend/build/robots.txt room_booking/staticfiles/
+      fi
+      if [ -f "frontend/build/grfs-logo.png" ]; then
+        cp frontend/build/grfs-logo.png room_booking/staticfiles/
+      fi
 
       # Copy React index.html into Django templates
       cp frontend/build/index.html room_booking/booking/templates/
