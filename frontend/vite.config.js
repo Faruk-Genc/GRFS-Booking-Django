@@ -18,7 +18,9 @@ export default defineConfig({
   },
   build: {
     outDir: 'build',
-    sourcemap: true
+    sourcemap: true,
+    // Output assets to 'static' directory to match Django's STATIC_URL
+    assetsDir: 'static'
   },
   base: '/'
 })

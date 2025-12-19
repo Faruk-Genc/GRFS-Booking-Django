@@ -30,6 +30,8 @@ urlpatterns = [
 if not settings.DEBUG:
     urlpatterns += [
         path('', TemplateView.as_view(template_name='index.html')),
+        # Exclude api/, admin/, static/, and media/ from catch-all
+        # static/ is where Vite outputs CSS/JS files (configured in vite.config.js)
         re_path(r'^(?!api/|admin/|static/|media/).*$', TemplateView.as_view(template_name='index.html')),
     ]
 else:
