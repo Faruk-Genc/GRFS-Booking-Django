@@ -80,26 +80,53 @@ class UserSerializer(serializers.ModelSerializer):
             
             username = validated_data.get('username', '').strip()
             if not username:
-                # If username not provided, use email as username
+                # If username not provided, use email prefix as username
                 username = email.split('@')[0]
+                # Ensure username is valid (max 150 chars, alphanumeric + @/./+/-/_)
+                username = ''.join(c for c in username if c.isalnum() or c in '@.+-_')[:150]
+                if not username:
+                    username = 'user'  # Fallback if email prefix is invalid
+            
+            # Ensure username is unique by appending numbers if needed
+            base_username = username
+            counter = 1
+            while User.objects.filter(username=username).exists():
+                username = f"{base_username}{counter}"
+                counter += 1
+                if counter > 1000:  # Safety limit
+                    raise serializers.ValidationError({"username": "Unable to generate unique username. Please provide a username."})
             
             password = validated_data.get('password')
             if not password:
                 raise serializers.ValidationError({"password": "Password is required."})
             
             # Create user
-            user = User(
-                username=username,
-                email=email,
-                first_name=validated_data.get('first_name', '').strip(),
-                last_name=validated_data.get('last_name', '').strip(),
-                gender=validated_data.get('gender', ''),
-                role='user',  # Always set to 'user' on registration for security
-                approval_status='pending'  # New users require admin approval
-            )
+            try:
+                user = User(
+                    username=username,
+                    email=email,
+                    first_name=validated_data.get('first_name', '').strip(),
+                    last_name=validated_data.get('last_name', '').strip(),
+                    gender=validated_data.get('gender', ''),
+                    role='user',  # Always set to 'user' on registration for security
+                    approval_status='pending'  # New users require admin approval
+                )
 
-            user.set_password(password)
-            user.save()
+                user.set_password(password)
+                user.save()
+            except Exception as db_error:
+                # Catch database errors during save
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Database error saving user: {str(db_error)}", exc_info=True)
+                # Re-raise as ValidationError with user-friendly message
+                error_str = str(db_error).lower()
+                if 'unique' in error_str or 'duplicate' in error_str:
+                    if 'email' in error_str:
+                        raise serializers.ValidationError({"email": "An account with this email already exists."})
+                    elif 'username' in error_str:
+                        raise serializers.ValidationError({"username": "An account with this username already exists."})
+                raise serializers.ValidationError({"detail": f"Failed to create account: {str(db_error)}"})
             
             # Send account creation email (don't fail registration if email fails)
             # Wrap in try/except to catch any network/DNS errors
@@ -116,13 +143,14 @@ class UserSerializer(serializers.ModelSerializer):
             
             return user
         except serializers.ValidationError:
-            # Re-raise validation errors
+            # Re-raise validation errors as-is
             raise
         except Exception as e:
             # Log unexpected errors
             import logging
             logger = logging.getLogger(__name__)
             logger.error(f"Error creating user: {str(e)}", exc_info=True)
+            # Re-raise as ValidationError so DRF handles it properly
             raise serializers.ValidationError({"detail": f"Failed to create user: {str(e)}"})
         
 

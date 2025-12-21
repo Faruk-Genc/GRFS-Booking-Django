@@ -3,7 +3,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions, generics
 from rest_framework import serializers
-from rest_framework.exceptions import AuthenticationFailed
+from rest_framework.exceptions import AuthenticationFailed, ValidationError as DRFValidationError
 from .models import Booking, Room, Floor
 from .serializers import *
 from django.contrib.auth import get_user_model
@@ -13,6 +13,7 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from datetime import datetime, timedelta
 from django.db.models import Q
+from django.db import IntegrityError, DatabaseError
 from django.http import HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
@@ -622,16 +623,52 @@ class RegisterView(generics.CreateAPIView):
     
     def create(self, request, *args, **kwargs):
         try:
-            return super().create(request, *args, **kwargs)
-        except Exception as e:
-            logger.error(f"Error in user registration: {str(e)}", exc_info=True)
-            # Return a more user-friendly error message
-            if 'email' in str(e).lower() and 'unique' in str(e).lower():
+            # Let DRF handle the request normally
+            response = super().create(request, *args, **kwargs)
+            return response
+        except DRFValidationError as e:
+            # DRF validation errors should return 400, not 500
+            logger.warning(f"Validation error in registration: {str(e)}")
+            return Response(
+                e.detail if hasattr(e, 'detail') else {"detail": str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except IntegrityError as e:
+            # Database integrity errors (unique constraints, etc.)
+            error_str = str(e).lower()
+            logger.error(f"Database integrity error in registration: {str(e)}", exc_info=True)
+            if 'email' in error_str and ('unique' in error_str or 'duplicate' in error_str):
                 return Response(
                     {"detail": "An account with this email already exists."},
                     status=status.HTTP_400_BAD_REQUEST
                 )
-            elif 'username' in str(e).lower() and 'unique' in str(e).lower():
+            elif 'username' in error_str and ('unique' in error_str or 'duplicate' in error_str):
+                return Response(
+                    {"detail": "An account with this username already exists."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            else:
+                return Response(
+                    {"detail": "An account with this information already exists."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        except DatabaseError as e:
+            # General database errors
+            logger.error(f"Database error in registration: {str(e)}", exc_info=True)
+            return Response(
+                {"detail": "A database error occurred. Please try again later."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        except Exception as e:
+            # Catch any other unexpected errors
+            logger.error(f"Unexpected error in user registration: {str(e)}", exc_info=True)
+            error_str = str(e).lower()
+            if 'email' in error_str and 'unique' in error_str:
+                return Response(
+                    {"detail": "An account with this email already exists."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            elif 'username' in error_str and 'unique' in error_str:
                 return Response(
                     {"detail": "An account with this username already exists."},
                     status=status.HTTP_400_BAD_REQUEST
