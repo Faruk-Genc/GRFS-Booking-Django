@@ -635,19 +635,21 @@ const AdminDashboard = () => {
       <div className="admin-dashboard-header">
         
         <div className="calendar-navigation">
-          <button onClick={() => navigateDate(-1)} className="nav-btn">← Previous</button>
-          <button onClick={goToToday} className="nav-btn today-btn">Today</button>
-          <button onClick={() => navigateDate(1)} className="nav-btn">Next →</button>
-          <div className="current-date-display">
-            {viewMode === 'day' && currentDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-            {viewMode === 'week' && (
-              <>
-                {getWeekDays()[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - 
-                {getWeekDays()[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-              </>
-            )}
-            {viewMode === 'month' && currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-          </div>
+          <div className="date-nav">
+            <button onClick={() => navigateDate(-1)} className="nav-btn">← Previous</button>
+            <button onClick={goToToday} className="nav-btn today-btn">Today</button>
+            <button onClick={() => navigateDate(1)} className="nav-btn">Next →</button>
+            <div className="current-date-display">
+              {viewMode === 'day' && currentDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+              {viewMode === 'week' && (
+                <>
+                  {getWeekDays()[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - 
+                  {getWeekDays()[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                </>
+              )}
+              {viewMode === 'month' && currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+            </div>
+          </div>  
           {(viewMode === 'week' || viewMode === 'month') && (
             <div className="room-filter">
               <label htmlFor="room-select">Filter by Room:</label>
