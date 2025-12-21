@@ -13,17 +13,11 @@ logger = logging.getLogger(__name__)
 
 def is_email_configured():
     """Check if email is properly configured"""
-    # Check if email credentials are set
-    has_credentials = (
+    return (
         settings.EMAIL_HOST_USER and 
         settings.EMAIL_HOST_PASSWORD and 
         settings.DEFAULT_FROM_EMAIL
     )
-    
-    # Also check if EMAIL_HOST is set (required for SMTP)
-    has_host = bool(settings.EMAIL_HOST)
-    
-    return has_credentials and has_host
 
 
 def send_account_creation_email(user):
@@ -52,7 +46,7 @@ Once approved, you'll be able to log in and start booking rooms.
 If you have any questions, please contact the administrator.
 
 Best regards,
-GRFS Booking System
+Grand River Friendship Society
         """
         
         send_mail(
@@ -60,13 +54,11 @@ GRFS Booking System
             message=message,
             from_email=settings.DEFAULT_FROM_EMAIL,
             recipient_list=[user.email],
-            fail_silently=True,  # Don't raise exceptions - just log them
+            fail_silently=False,
         )
         logger.info(f"Account creation email sent to {user.email}")
     except Exception as e:
-        # Catch all exceptions including network errors (DNS, connection, etc.)
-        logger.error(f"Failed to send account creation email to {user.email}: {str(e)}", exc_info=True)
-        # Don't re-raise - email failures shouldn't break registration
+        logger.error(f"Failed to send account creation email to {user.email}: {str(e)}")
 
 
 def send_account_approval_email(user, approved=True):
@@ -90,7 +82,7 @@ Login at: {settings.SITE_URL}/login
 If you have any questions, please contact the administrator.
 
 Best regards,
-GRFS Booking System
+Grand River Friendship Society
             """
         else:
             subject = 'GRFS Booking System - Account Denied'
@@ -103,7 +95,7 @@ If you believe this is an error or would like to appeal this decision,
 please contact the administrator.
 
 Best regards,
-GRFS Booking System
+Grand River Friendship Society
             """
         
         send_mail(
@@ -154,7 +146,7 @@ You can view and manage your bookings at: {settings.SITE_URL}/dashboard
 If you need to make changes or cancel this booking, please do so through the dashboard.
 
 Best regards,
-GRFS Booking System
+Grand River Friendship Society
         """
         
         send_mail(
@@ -220,7 +212,7 @@ You can view your updated booking at: {settings.SITE_URL}/dashboard
 If you did not make these changes, please contact the administrator immediately.
 
 Best regards,
-GRFS Booking System
+Grand River Friendship Society
         """
         
         send_mail(
@@ -269,7 +261,7 @@ Cancelled Booking Details:
 You can view your bookings at: {settings.SITE_URL}/dashboard
 
 Best regards,
-GRFS Booking System
+Grand River Friendship Society
         """
         
         send_mail(
@@ -326,7 +318,7 @@ You can view your booking details at: {settings.SITE_URL}/dashboard
 If you need to cancel or modify this booking, please do so as soon as possible.
 
 Best regards,
-GRFS Booking System
+Grand River Friendship Society
         """
         
         send_mail(

@@ -20,7 +20,7 @@
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   justify-content: space-between;  /* Spread items across */
   align-items: center;             /* Vertically center */
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   width: 100%;
   box-sizing: border-box;
 }
@@ -32,10 +32,15 @@
   flex-shrink: 0;
 }
 
+.calendar-navigation, .header-top{
+  flex: 1 1 auto;
+}
+
 .header-top {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 15px;
 }
 
 .view-controls {
@@ -70,8 +75,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 15px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 
 .nav-btn {
@@ -530,6 +534,14 @@
   padding: 20px;
 }
 
+.date-nav{
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
 .booking-modal {
   background: white;
   border-radius: 8px;
@@ -840,16 +852,18 @@
   }
 
   .header-top {
-    flex-direction: column;
+    flex-direction: row;
     gap: 15px;
     width: 100%;
+    overflow: hidden;
+    flex-wrap: wrap;
   }
 
   .view-controls {
     width: 100%;
     justify-content: center;
     gap: 8px;
-    flex-direction: column;
+    flex-direction: row;
   }
 
   .view-btn {
@@ -858,9 +872,15 @@
   }
 
   .calendar-navigation {
-    flex-direction: column;
+    flex-direction: row;
     gap: 10px;
     width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .date-nav{
+    display: flex;
+    gap: 5px;
   }
 
   .current-date-display {
@@ -874,7 +894,7 @@
     width: 100%;
     margin: 10px 0 0 0;
     justify-content: center;
-    flex-direction: column;
+    flex-direction: row;
     align-items: center;
   }
 
