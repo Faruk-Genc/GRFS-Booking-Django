@@ -68,33 +68,59 @@ class UserSerializer(serializers.ModelSerializer):
         return value
 
     def create(self, validated_data):
-        # Force role to 'user' during registration - only admins can change roles
-        # Remove role from validated_data if present to prevent role escalation
-        validated_data.pop('role', None)
-        user = User(
-            username=validated_data['username'],
-            email=validated_data.get('email', ''),
-            first_name=validated_data.get('first_name', ''),
-            last_name=validated_data.get('last_name', ''),
-            gender=validated_data.get('gender', ''),
-            role='user',  # Always set to 'user' on registration for security
-            approval_status='pending'  # New users require admin approval
-        )
-
-        user.set_password(validated_data['password'])
-        user.save()
-        
-        # Send account creation email
         try:
-            from .email_utils import send_account_creation_email
-            send_account_creation_email(user)
+            # Force role to 'user' during registration - only admins can change roles
+            # Remove role from validated_data if present to prevent role escalation
+            validated_data.pop('role', None)
+            
+            # Get required fields with validation
+            email = validated_data.get('email', '').strip().lower()
+            if not email:
+                raise serializers.ValidationError({"email": "Email is required."})
+            
+            username = validated_data.get('username', '').strip()
+            if not username:
+                # If username not provided, use email as username
+                username = email.split('@')[0]
+            
+            password = validated_data.get('password')
+            if not password:
+                raise serializers.ValidationError({"password": "Password is required."})
+            
+            # Create user
+            user = User(
+                username=username,
+                email=email,
+                first_name=validated_data.get('first_name', '').strip(),
+                last_name=validated_data.get('last_name', '').strip(),
+                gender=validated_data.get('gender', ''),
+                role='user',  # Always set to 'user' on registration for security
+                approval_status='pending'  # New users require admin approval
+            )
+
+            user.set_password(password)
+            user.save()
+            
+            # Send account creation email (don't fail registration if email fails)
+            try:
+                from .email_utils import send_account_creation_email
+                send_account_creation_email(user)
+            except Exception as e:
+                # Log error but don't fail registration if email fails
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Failed to send account creation email: {str(e)}")
+            
+            return user
+        except serializers.ValidationError:
+            # Re-raise validation errors
+            raise
         except Exception as e:
-            # Log error but don't fail registration if email fails
+            # Log unexpected errors
             import logging
             logger = logging.getLogger(__name__)
-            logger.error(f"Failed to send account creation email: {str(e)}")
-        
-        return user
+            logger.error(f"Error creating user: {str(e)}", exc_info=True)
+            raise serializers.ValidationError({"detail": f"Failed to create user: {str(e)}"})
         
 
 class FloorSerializer(serializers.ModelSerializer):

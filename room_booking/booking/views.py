@@ -620,6 +620,28 @@ class RegisterView(generics.CreateAPIView):
     serializer_class = UserSerializer
     permission_classes = [permissions.AllowAny]
     
+    def create(self, request, *args, **kwargs):
+        try:
+            return super().create(request, *args, **kwargs)
+        except Exception as e:
+            logger.error(f"Error in user registration: {str(e)}", exc_info=True)
+            # Return a more user-friendly error message
+            if 'email' in str(e).lower() and 'unique' in str(e).lower():
+                return Response(
+                    {"detail": "An account with this email already exists."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            elif 'username' in str(e).lower() and 'unique' in str(e).lower():
+                return Response(
+                    {"detail": "An account with this username already exists."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            else:
+                return Response(
+                    {"detail": f"Registration failed: {str(e)}"},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+    
 class LoginSerializer(TokenObtainPairSerializer):
     @classmethod
     def get_token(cls, user):
