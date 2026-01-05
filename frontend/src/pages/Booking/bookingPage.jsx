@@ -146,6 +146,26 @@ const BookingPage = () => {
     return name.includes('downstairs') || name.includes('first') || name.includes('ground') || name === '1' || name === 'floor 1';
   };
 
+  // Helper function to get static image path for a room
+  // Images should be placed in frontend/public/rooms/ directory
+  // Supported formats: jpg, jpeg, png, webp
+  const getRoomImage = (room) => {
+    const roomId = room.id;
+    const roomName = room.name?.toLowerCase().replace(/\s+/g, '-') || `room-${roomId}`;
+    
+    // Try multiple naming conventions and formats
+    const imageFormats = ['jpg', 'jpeg', 'png', 'webp'];
+    const namingConventions = [
+      `room-${roomId}`,           // room-1.jpg
+      `room-${roomName}`,         // room-conference-room.jpg
+      roomName,                   // conference-room.jpg
+    ];
+    
+    // Return the first convention with jpg extension as default
+    // The browser will handle 404s gracefully, or you can add error handling
+    return `/rooms/room-${roomId}.jpg`;
+  };
+
   return (
     <div className="container">
       <h2>Building Rooms</h2>
@@ -201,7 +221,16 @@ const BookingPage = () => {
                     fetchedRooms[floor.id].map((room) => (
                       <li key={room.id} className="room-item" onClick={() => handleRoomSelection(room.id)}>
                         <div className="room-content">
-                          <img src={room.image} alt={room.name} className="room-image" />
+                          <img 
+                            src={getRoomImage(room)} 
+                            alt={room.name} 
+                            className="room-image"
+                            onError={(e) => {
+                              // Fallback to a placeholder if image doesn't exist
+                              e.target.src = '/rooms/placeholder.jpg';
+                              e.target.onerror = null; // Prevent infinite loop
+                            }}
+                          />
                           <span className="room-name">{room.name}</span>
                         </div>
                         <input
