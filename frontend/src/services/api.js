@@ -157,3 +157,11 @@ export const updateBookingStatus = async (bookingId, status) => {
 export const deleteAllBookings = async () => {
   return await API.delete('admin/bookings/delete-all/');
 };
+
+export const requestPasswordReset = async (data) => {
+  return await API.post('auth/password-reset/', data);
+};
+
+export const confirmPasswordReset = async (data) => {
+  return await API.post('auth/password-reset-confirm/', data);
+};

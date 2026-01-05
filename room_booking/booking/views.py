@@ -765,6 +765,130 @@ class UserDetailView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+
+class PasswordResetRequestView(APIView):
+    """Request a password reset - sends email with reset token"""
+    permission_classes = [permissions.AllowAny]
+    
+    def post(self, request):
+        try:
+            email = request.data.get('email', '').strip().lower()
+            
+            if not email:
+                return Response(
+                    {"detail": "Email is required."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Try to find user by email
+            try:
+                user = User.objects.get(email=email)
+            except User.DoesNotExist:
+                # Don't reveal if email exists or not for security
+                # Still return success to prevent email enumeration
+                logger.info(f"Password reset requested for non-existent email: {email}")
+                return Response(
+                    {"detail": "If an account with that email exists, a password reset link has been sent."},
+                    status=status.HTTP_200_OK
+                )
+            
+            # Generate password reset token using Django's default token generator
+            from django.contrib.auth.tokens import default_token_generator
+            from django.utils.http import urlsafe_base64_encode
+            from django.utils.encoding import force_bytes
+            
+            token = default_token_generator.make_token(user)
+            uid = urlsafe_base64_encode(force_bytes(user.pk))
+            
+            # Send password reset email
+            try:
+                from .email_utils import send_password_reset_email
+                send_password_reset_email(user, token, uid)
+                logger.info(f"Password reset email sent to {user.email}")
+            except Exception as e:
+                logger.error(f"Failed to send password reset email: {str(e)}")
+                return Response(
+                    {"detail": "Failed to send password reset email. Please try again later."},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+            
+            # Return success (don't reveal if email exists)
+            return Response(
+                {"detail": "If an account with that email exists, a password reset link has been sent."},
+                status=status.HTTP_200_OK
+            )
+            
+        except Exception as e:
+            logger.error(f"Error in password reset request: {str(e)}", exc_info=True)
+            return Response(
+                {"detail": "An error occurred. Please try again later."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class PasswordResetConfirmView(APIView):
+    """Confirm password reset - validates token and sets new password"""
+    permission_classes = [permissions.AllowAny]
+    
+    def post(self, request):
+        try:
+            uid = request.data.get('uid', '').strip()
+            token = request.data.get('token', '').strip()
+            new_password = request.data.get('password', '').strip()
+            
+            if not uid or not token or not new_password:
+                return Response(
+                    {"detail": "UID, token, and password are required."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Validate password length
+            if len(new_password) < 8:
+                return Response(
+                    {"detail": "Password must be at least 8 characters long."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Decode user ID
+            from django.utils.http import urlsafe_base64_decode
+            from django.utils.encoding import force_str
+            
+            try:
+                user_id = force_str(urlsafe_base64_decode(uid))
+                user = User.objects.get(pk=user_id)
+            except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+                return Response(
+                    {"detail": "Invalid reset link. Please request a new password reset."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Validate token
+            from django.contrib.auth.tokens import default_token_generator
+            
+            if not default_token_generator.check_token(user, token):
+                return Response(
+                    {"detail": "Invalid or expired reset link. Please request a new password reset."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Set new password
+            user.set_password(new_password)
+            user.save()
+            
+            logger.info(f"Password reset successful for user {user.email}")
+            
+            return Response(
+                {"detail": "Password has been reset successfully. You can now log in with your new password."},
+                status=status.HTTP_200_OK
+            )
+            
+        except Exception as e:
+            logger.error(f"Error in password reset confirm: {str(e)}", exc_info=True)
+            return Response(
+                {"detail": "An error occurred. Please try again later."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
 class CheckAvailabilityView(APIView):
     """
     Check availability of rooms for a specific date.
