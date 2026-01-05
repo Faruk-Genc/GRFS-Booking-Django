@@ -161,9 +161,3 @@ services:
         sync: false
       - key: SITE_URL
         sync: false
-
-databases:
-  - name: grfs-booking-db
-    plan: free
-    databaseName: grfs_booking
-    user: grfs_admin
