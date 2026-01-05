@@ -124,9 +124,52 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 DB_ENGINE = os.getenv('DB_ENGINE', 'postgresql').lower()
 
 if DATABASE_URL:
-    DATABASES = {
-        "default": dj_database_url.parse(DATABASE_URL, conn_max_age=600)
-    }
+    # Parse DATABASE_URL - Render provides connection strings with SSL already configured
+    # Render databases require SSL, which is typically included in the connection string
+    try:
+        # Parse the database URL with connection pooling
+        db_config = dj_database_url.parse(
+            DATABASE_URL, 
+            conn_max_age=600  # Keep connections alive for 10 minutes
+        )
+        
+        # Ensure OPTIONS dict exists for additional settings
+        if 'OPTIONS' not in db_config:
+            db_config['OPTIONS'] = {}
+        
+        # Add connection timeout for production
+        if not DEBUG:
+            # Set a reasonable connection timeout (10 seconds)
+            db_config['OPTIONS']['connect_timeout'] = 10
+        
+        DATABASES = {
+            "default": db_config
+        }
+    except Exception as e:
+        # Log database configuration error but don't fail silently
+        import warnings
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error parsing DATABASE_URL: {str(e)}")
+        warnings.warn(
+            f"Error parsing DATABASE_URL: {str(e)}. "
+            "Falling back to individual database environment variables.",
+            UserWarning
+        )
+        # Fallback to individual environment variables
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.postgresql',
+                'NAME': os.getenv('DB_NAME', 'room_booking'),
+                'USER': os.getenv('DB_USER', 'room_admin'),
+                'PASSWORD': os.getenv('DB_PASSWORD'),
+                'HOST': os.getenv('DB_HOST', 'localhost'),
+                'PORT': os.getenv('DB_PORT', '5432'),
+                'OPTIONS': {
+                    'connect_timeout': 10,
+                },
+            }
+        }
 else:
     # Local fallback (if no DATABASE_URL is set)
     DATABASES = {
