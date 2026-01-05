@@ -149,21 +149,44 @@ const BookingPage = () => {
   // Helper function to get static image path for a room
   // Images should be placed in frontend/public/rooms/ directory
   // Supported formats: jpg, jpeg, png, webp
+  // In production, images are served from /static/rooms/ via Django/WhiteNoise
   const getRoomImage = (room) => {
     const roomId = room.id;
-    const roomName = room.name?.toLowerCase().replace(/\s+/g, '-') || `room-${roomId}`;
+    // Use /static/rooms/ for production (Django serves static files from /static/)
+    // In development, Vite serves from /rooms/ directly
+    const basePath = import.meta.env.DEV ? '/rooms' : '/static/rooms';
+    return `${basePath}/room-${roomId}.jpeg`;
+  };
+
+  // Helper function to handle image loading errors and try alternative extensions
+  const handleImageError = (e, roomId) => {
+    const target = e.target;
+    const currentSrc = target.src;
     
-    // Try multiple naming conventions and formats
-    const imageFormats = ['jpg', 'jpeg', 'png', 'webp'];
-    const namingConventions = [
-      `room-${roomId}`,           // room-1.jpg
-      `room-${roomName}`,         // room-conference-room.jpg
-      roomName,                   // conference-room.jpg
-    ];
+    // Extract the base path and try different extensions
+    const extensions = ['jpeg', 'jpg', 'png', 'webp'];
+    const basePath = import.meta.env.DEV ? '/rooms' : '/static/rooms';
     
-    // Return the first convention with jpg extension as default
-    // The browser will handle 404s gracefully, or you can add error handling
-    return `/rooms/room-${roomId}.jpg`;
+    // Find which extension we're currently trying
+    let currentExt = 'jpeg';
+    for (const ext of extensions) {
+      if (currentSrc.includes(`.${ext}`)) {
+        currentExt = ext;
+        break;
+      }
+    }
+    
+    // Try next extension
+    const currentIndex = extensions.indexOf(currentExt);
+    if (currentIndex < extensions.length - 1) {
+      const nextExt = extensions[currentIndex + 1];
+      target.src = `${basePath}/room-${roomId}.${nextExt}`;
+    } else {
+      // All extensions tried, use placeholder
+      const placeholderPath = import.meta.env.DEV ? '/rooms' : '/static/rooms';
+      target.src = `${placeholderPath}/placeholder.jpg`;
+      target.onerror = null; // Prevent infinite loop
+    }
   };
 
   return (
@@ -225,11 +248,8 @@ const BookingPage = () => {
                             src={getRoomImage(room)} 
                             alt={room.name} 
                             className="room-image"
-                            onError={(e) => {
-                              // Fallback to a placeholder if image doesn't exist
-                              e.target.src = '/rooms/placeholder.jpg';
-                              e.target.onerror = null; // Prevent infinite loop
-                            }}
+                            onError={(e) => handleImageError(e, room.id)}
+                            loading="lazy"
                           />
                           <span className="room-name">{room.name}</span>
                         </div>

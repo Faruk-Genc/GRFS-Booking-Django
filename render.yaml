@@ -54,6 +54,12 @@ services:
       # Copy other files from build root (favicon, manifest, robots.txt, logo, etc.)
       find frontend/build -maxdepth 1 -type f ! -name "index.html" -exec cp {} room_booking/staticfiles/ \;
       
+      # Copy rooms directory if it exists (room images from public/rooms/)
+      if [ -d "frontend/build/rooms" ]; then
+        echo "Copying room images..."
+        cp -r frontend/build/rooms room_booking/staticfiles/
+      fi
+      
       # Copy other assets (favicon, manifest, robots.txt, etc.)
       if [ -f "frontend/build/favicon.ico" ]; then
         cp frontend/build/favicon.ico room_booking/staticfiles/
