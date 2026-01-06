@@ -13,7 +13,7 @@ class UserSerializer(serializers.ModelSerializer):
         read_only_fields = ['role', 'approval_status']  # Role and approval status cannot be set via regular API, only by admins
 
     def validate_email(self, value):
-        """Validate email format"""
+        """Validate email format and verify domain exists"""
         if not value:
             raise serializers.ValidationError("Email is required.")
         
@@ -52,6 +52,61 @@ class UserSerializer(serializers.ModelSerializer):
         # Check for consecutive dots
         if '..' in email:
             raise serializers.ValidationError("Email cannot contain consecutive dots.")
+        
+        # Verify email domain exists by checking MX records
+        try:
+            import dns.resolver
+            import logging
+            logger = logging.getLogger(__name__)
+            
+            # Check for MX records (mail exchange records)
+            # This verifies the domain can receive emails
+            domain_valid = False
+            try:
+                mx_records = dns.resolver.resolve(domain, 'MX', lifetime=5)
+                if mx_records:
+                    domain_valid = True
+            except dns.resolver.NoAnswer:
+                # No MX records found, try checking if domain exists with A record as fallback
+                try:
+                    a_records = dns.resolver.resolve(domain, 'A', lifetime=5)
+                    if a_records:
+                        domain_valid = True
+                except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN):
+                    pass  # Domain doesn't exist
+            except dns.resolver.NXDOMAIN:
+                # Domain does not exist
+                pass
+            except dns.resolver.Timeout:
+                # DNS query timed out - retry once with longer timeout
+                try:
+                    mx_records = dns.resolver.resolve(domain, 'MX', lifetime=10)
+                    if mx_records:
+                        domain_valid = True
+                except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN, dns.resolver.Timeout):
+                    raise serializers.ValidationError("Unable to verify the email domain. Please check your email address and try again.")
+            except dns.exception.DNSException as e:
+                # Other DNS errors - log and reject
+                logger.warning(f"DNS error while validating email domain {domain}: {str(e)}")
+                raise serializers.ValidationError("Unable to verify the email domain. Please check your email address and try again.")
+            
+            if not domain_valid:
+                raise serializers.ValidationError("The email domain does not exist or cannot receive emails. Please enter a valid email address.")
+                
+        except ImportError:
+            # dnspython not available - skip domain validation
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning("dnspython not available - skipping email domain validation")
+        except serializers.ValidationError:
+            # Re-raise validation errors as-is
+            raise
+        except Exception as e:
+            # Unexpected errors - reject registration to be safe
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Unexpected error during email domain validation for {domain}: {str(e)}")
+            raise serializers.ValidationError("Unable to verify the email domain. Please check your email address and try again.")
         
         return email
 
