@@ -606,7 +606,7 @@ const AdminDashboard = () => {
                         {formatTime(booking.start_datetime)} - {formatTime(booking.end_datetime)}
                       </span>
                       <span className="booking-room-small">
-                        {booking.rooms.map(r => r.name).join(', ')}
+                        {booking.rooms.map(r => r.name).join(', ')} - {booking.user.first_name} {booking.user.last_name}
                       </span>
                     </div>
                   ))}
