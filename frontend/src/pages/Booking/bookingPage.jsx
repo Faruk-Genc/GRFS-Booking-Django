@@ -15,13 +15,13 @@ const BookingPage = () => {
   const [user, setUser] = useState(null);
 
   useEffect(() => {
-    // Fetch user data to check role
+    // Fetch user data to check role (optional - user may not be logged in)
     const fetchUserData = async () => {
       try {
         const response = await getUser();
         setUser(response.data);
       } catch (err) {
-        // User not logged in or token expired - handled by PrivateRoute
+        // User not logged in - this is fine, they can still browse rooms
         setUser(null);
       }
     };

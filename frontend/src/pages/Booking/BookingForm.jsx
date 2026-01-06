@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { checkAvailability, createBooking } from '../../services/api';
+import { checkAvailability, createBooking, getUser } from '../../services/api';
 import '../../styles/BookingPage.css';
 
 const BookingForm = () => {
@@ -132,6 +132,16 @@ const BookingForm = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Check if user is authenticated before submitting
+    try {
+      await getUser();
+    } catch (err) {
+      // User is not authenticated, redirect to login
+      alert('Please log in to complete your booking.');
+      navigate('/login', { state: { from: '/booking-form', search: window.location.search } });
+      return;
+    }
     
     if (isCampBooking) {
       // Camp booking validation
@@ -503,7 +513,7 @@ const BookingForm = () => {
               disabled={submitting || !selectedDate || !startTime || !endTime || (isCampBooking && !selectedEndDate)}
               className="btn-primary"
             >
-              {submitting ? 'Creating Booking...' : isCampBooking ? 'Submit Camp Booking' : 'Confirm Booking'}
+              {submitting ? 'Creating Booking...' : isCampBooking ? 'Submit Camp Booking' : 'Complete Booking'}
             </button>
           </div>
         </form>

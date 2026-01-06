@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { loginUser } from '../../services/api';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import '../../styles/LoginPage.css';
 
 const LoginPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -30,7 +31,11 @@ const handleSubmit = async (e) => {
     const res = await loginUser(dataToSend);
     localStorage.setItem('access', res.data.access);
     localStorage.setItem('refresh', res.data.refresh);
-    navigate('/');
+    
+    // Redirect to the page the user came from, or home if no redirect specified
+    const from = location.state?.from || '/';
+    const search = location.state?.search || '';
+    navigate(from + search);
   } catch (err) {
     // Only show generic error to user, don't expose internal details
     setError('Invalid credentials. Please try again.');

@@ -21,14 +21,7 @@ function App() {
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password/:uid/:token" element={<ResetPasswordPage />} />
-        <Route
-          path="/"
-          element={
-            <PrivateRoute>
-              <BookingPage />
-            </PrivateRoute>
-          }
-        />
+        <Route path="/" element={<BookingPage />} />
         <Route
           path="/dashboard"
           element={
@@ -37,22 +30,8 @@ function App() {
             </PrivateRoute>
           }
         />
-        <Route
-          path="/bookingpage"
-          element={
-            <PrivateRoute>
-              <BookingPage />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/booking-form"
-          element={
-            <PrivateRoute>
-              <BookingForm />
-            </PrivateRoute>
-          }
-        />
+        <Route path="/bookingpage" element={<BookingPage />} />
+        <Route path="/booking-form" element={<BookingForm />} />
         <Route
           path="/admin"
           element={

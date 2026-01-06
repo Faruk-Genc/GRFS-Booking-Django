@@ -894,7 +894,7 @@ class CheckAvailabilityView(APIView):
     Check availability of rooms for a specific date.
     Returns available time slots for the given rooms on the specified date.
     """
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]  # Allow anyone to check availability
     
     def get(self, request):
         try:
