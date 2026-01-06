@@ -22,13 +22,6 @@ h2 {
   color: #333;
 }
 
-h4 {
-  margin: 0;
-  flex: 1;
-  color: gray;
-  text-align: center;
-  font-size: 15px;
-}
 
 /* Accordion Styles */
 .accordion {
@@ -134,15 +127,6 @@ h4 {
   flex-grow: 1;
 }
 
-/* Floor Header Buttons Container */
-.floor-header-buttons {
-  display: flex;
-  gap: 10px;
-  justify-content: flex-end;  
-  align-items: center;
-  flex-wrap: wrap;
-  flex-shrink: 0;
-}
 
 .floor-header-text {
   display: flex;
@@ -151,44 +135,26 @@ h4 {
   align-items: center;
 }
 
-/* Book Entire Floor Button */
-.book-floor-btn {
-  max-height: 40px;
-  background-color: #d40000;
-  color: #ffffff;
-  padding: 10px 20px;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-  transition: background-color 0.3s ease;
-  font-size: 16px;
-  white-space: nowrap;
+/* Dropdown Arrow */
+.dropdown-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  transition: transform 0.3s ease;
   flex-shrink: 0;
+  margin-left: 15px;
 }
 
-.book-floor-btn:hover {
-  background-color: #0f2447;
+.dropdown-arrow svg {
+  width: 24px;
+  height: 24px;
 }
 
-/* Book for Camp Button */
-.book-camp-btn {
-  max-height: 40px;
-  background-color: #d40000;
-  color: #ffffff;
-  padding: 10px 20px;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-  transition: background-color 0.3s ease;
-  font-size: 16px;
-  font-weight: 600;
-  white-space: nowrap;
-  flex-shrink: 0;
+.dropdown-arrow.open {
+  transform: rotate(180deg);
 }
 
-.book-camp-btn:hover {
-  background-color: #0f2447;
-}
 
 /* Checkbox Styling for Room Selection */
 input[type='checkbox'] {
@@ -210,10 +176,6 @@ input[type='checkbox'] {
     padding: 15px 10px;
   }
 
-  h4 {
-    font-size: 10px;
-
-  }
 
   .floor-header {
     font-size: 16px;
@@ -226,18 +188,15 @@ input[type='checkbox'] {
     width: 100%;
   }
 
-  .floor-header-buttons {
-    gap: 8px;
-    display: flex;
+  .dropdown-arrow {
+    margin-left: 10px;
   }
 
-  .book-floor-btn,
-  .book-camp-btn {
-    font-size: 14px;
-    padding: 8px 15px;
-    max-height: none;
-    min-width: 0;
+  .dropdown-arrow svg {
+    width: 20px;
+    height: 20px;
   }
+
 
   .room-item {
     font-size: 14px;
@@ -281,27 +240,21 @@ input[type='checkbox'] {
     padding: 10px 5px;
   }
 
-  h4 {
-    font-size: 7px;
-  }
 
   .floor-header {
     font-size: 14px;
     padding: 10px;
   }
 
-  .book-floor-btn {
-    font-size: 8px;
-    padding: 6px 12px;
-    
+  .dropdown-arrow {
+    margin-left: 8px;
   }
-  .book-camp-btn{
-    font-size: 8px;
-    padding: 6px 12px;
+
+  .dropdown-arrow svg {
+    width: 18px;
+    height: 18px;
   }
-  .floor-header-buttons {
-    flex-direction: row;
-  }
+
 
   .room-item {
     font-size: 13px;

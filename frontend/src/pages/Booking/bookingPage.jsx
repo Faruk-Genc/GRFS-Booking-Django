@@ -62,10 +62,7 @@ const BookingPage = () => {
     }
   };
 
-  const toggleFloor = (floorId, e) => {
-    // Prevent the header from collapsing when the "Book Entire Floor" button is clicked
-    if (e.target.classList.contains('book-floor-btn')) return;
-
+  const toggleFloor = (floorId) => {
     // Toggle the active floor state, allow multiple floors to stay open
     setActiveFloors((prev) => ({
       ...prev,
@@ -206,34 +203,15 @@ const BookingPage = () => {
           <div key={floor.id} className="floor">
             <div
               className="floor-header"
-              
-              onClick={(e) => toggleFloor(floor.id, e)} // Pass the event to prevent collapsing
+              onClick={() => toggleFloor(floor.id)}
             >
               <div className="floor-header-text">
                 <h3>{floor.name}</h3>
-                <h4>click to display rooms</h4>
               </div>
-              <div className="floor-header-buttons">
-                {isDownstairsFloor(floor) && user && ['mentor', 'coordinator', 'admin'].includes(user.role) && (
-                  <button 
-                    className="book-camp-btn" 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleCampBooking(floor.id);
-                    }}
-                  >
-                    Book for Camp
-                  </button>
-                )}
-                <button 
-                  className="book-floor-btn" 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleFloorBooking(floor.id);
-                  }}
-                >
-                  Select Entire Floor
-                </button>
+              <div className={`dropdown-arrow ${activeFloors[floor.id] ? 'open' : ''}`}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M6 9L12 15L18 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
               </div>
             </div>
 
