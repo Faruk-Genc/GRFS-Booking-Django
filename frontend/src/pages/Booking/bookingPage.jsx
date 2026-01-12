@@ -208,10 +208,23 @@ const BookingPage = () => {
               <div className="floor-header-text">
                 <h3>{floor.name}</h3>
               </div>
-              <div className={`dropdown-arrow ${activeFloors[floor.id] ? 'open' : ''}`}>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M6 9L12 15L18 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
+              <div className="floor-header-right">
+                {isDownstairsFloor(floor) && user && ['mentor', 'coordinator', 'admin'].includes(user.role) && (
+                  <button 
+                    className="book-camp-btn" 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleCampBooking(floor.id);
+                    }}
+                  >
+                    Book for Camp
+                  </button>
+                )}
+                <div className={`dropdown-arrow ${activeFloors[floor.id] ? 'open' : ''}`}>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M6 9L12 15L18 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </div>
               </div>
             </div>
 

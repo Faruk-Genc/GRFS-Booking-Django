@@ -135,6 +135,34 @@ h2 {
   align-items: center;
 }
 
+/* Floor Header Right Container */
+.floor-header-right {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  flex-shrink: 0;
+}
+
+/* Book for Camp Button */
+.book-camp-btn {
+  max-height: 40px;
+  background-color: #d40000;
+  color: #ffffff;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  font-size: 16px;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.book-camp-btn:hover {
+  background-color: #0f2447;
+}
+
 /* Dropdown Arrow */
 .dropdown-arrow {
   display: flex;
@@ -143,7 +171,6 @@ h2 {
   color: white;
   transition: transform 0.3s ease;
   flex-shrink: 0;
-  margin-left: 15px;
 }
 
 .dropdown-arrow svg {
@@ -188,8 +215,14 @@ input[type='checkbox'] {
     width: 100%;
   }
 
-  .dropdown-arrow {
-    margin-left: 10px;
+  .floor-header-right {
+    gap: 10px;
+  }
+
+  .book-camp-btn {
+    font-size: 14px;
+    padding: 8px 15px;
+    max-height: none;
   }
 
   .dropdown-arrow svg {
@@ -246,8 +279,14 @@ input[type='checkbox'] {
     padding: 10px;
   }
 
-  .dropdown-arrow {
-    margin-left: 8px;
+  .floor-header-right {
+    gap: 8px;
+  }
+
+  .book-camp-btn {
+    font-size: 12px;
+    padding: 6px 12px;
+    max-height: none;
   }
 
   .dropdown-arrow svg {

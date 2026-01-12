@@ -328,14 +328,22 @@ const AdminDashboard = () => {
     setEditUnavailableSlots([]);
   };
 
+  // Helper function to format date in local timezone (YYYY-MM-DD)
+  const formatDateLocal = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   const getBookingsForDate = (date) => {
     const filteredBookings = getFilteredBookings();
-    const dateStr = date.toISOString().split('T')[0];
+    const dateStr = formatDateLocal(date);
     return filteredBookings.filter(booking => {
       const startDate = new Date(booking.start_datetime);
       const endDate = new Date(booking.end_datetime);
-      const bookingStartStr = startDate.toISOString().split('T')[0];
-      const bookingEndStr = endDate.toISOString().split('T')[0];
+      const bookingStartStr = formatDateLocal(startDate);
+      const bookingEndStr = formatDateLocal(endDate);
       return dateStr >= bookingStartStr && dateStr <= bookingEndStr;
     });
   };
