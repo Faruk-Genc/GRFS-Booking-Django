@@ -373,3 +373,69 @@ Grand River Friendship Society
         logger.info(f"Password reset email sent to {user.email}")
     except Exception as e:
         logger.error(f"Failed to send password reset email to {user.email}: {str(e)}")
+
+
+def send_booking_approval_notification_to_admins(booking):
+    """Send email notification to all admins when a booking requires approval"""
+    if not is_email_configured():
+        logger.warning(f"Email not configured. Skipping booking approval notification for booking {booking.id}")
+        return
+    
+    try:
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        
+        # Get all admin users
+        admin_users = User.objects.filter(role='admin')
+        
+        if not admin_users.exists():
+            logger.warning("No admin users found. Skipping booking approval notification.")
+            return
+        
+        # Get booking details
+        booking_user = booking.user
+        rooms = booking.rooms.all()
+        room_names = ', '.join([f"{room.name} (Floor {room.floor.name})" for room in rooms])
+        
+        # Format datetime
+        start_str = booking.start_datetime.strftime('%B %d, %Y at %I:%M %p') if booking.start_datetime else 'N/A'
+        end_str = booking.end_datetime.strftime('%B %d, %Y at %I:%M %p') if booking.end_datetime else 'N/A'
+        
+        # Get admin email addresses
+        admin_emails = [admin.email for admin in admin_users if admin.email]
+        
+        if not admin_emails:
+            logger.warning("No admin users with email addresses found. Skipping booking approval notification.")
+            return
+        
+        subject = f'GRFS Booking System - New Booking Requires Approval (ID: {booking.id})'
+        message = f"""
+Hello Administrator,
+
+A new booking has been created and requires your approval.
+
+Booking Details:
+- Booking ID: {booking.id}
+- User: {booking_user.first_name or booking_user.username} ({booking_user.email})
+- Rooms: {room_names}
+- Start Time: {start_str}
+- End Time: {end_str}
+- Booking Type: {booking.booking_type.title()}
+- Status: {booking.status}
+
+Please review and approve or deny this booking at: {settings.SITE_URL}/admin-dashboard
+
+Best regards,
+Grand River Friendship Society
+        """
+        
+        send_mail(
+            subject=subject,
+            message=message,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=admin_emails,
+            fail_silently=False,
+        )
+        logger.info(f"Booking approval notification sent to {len(admin_emails)} admin(s) for booking {booking.id}")
+    except Exception as e:
+        logger.error(f"Failed to send booking approval notification to admins: {str(e)}")

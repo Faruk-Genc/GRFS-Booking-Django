@@ -300,4 +300,18 @@ class BookingSerializer(serializers.ModelSerializer):
             else:
                 validated_data['status'] = 'Pending'
         
-        return super().create(validated_data)
+        # Create the booking
+        booking = super().create(validated_data)
+        
+        # Send notification to admins if booking requires approval
+        if booking.status == 'Pending':
+            try:
+                from .email_utils import send_booking_approval_notification_to_admins
+                send_booking_approval_notification_to_admins(booking)
+            except Exception as e:
+                # Log error but don't fail booking creation if email fails
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Failed to send booking approval notification to admins: {str(e)}")
+        
+        return booking
