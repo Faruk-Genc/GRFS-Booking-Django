@@ -274,8 +274,11 @@ class BookingSerializer(serializers.ModelSerializer):
         # Get booking type (default to 'regular' if not provided)
         booking_type = validated_data.get('booking_type', 'regular')
         
-        # Camp bookings always require admin approval
-        if booking_type == 'camp':
+        # Auto-approve bookings made by admins
+        if user.role == 'admin':
+            validated_data['status'] = 'Approved'
+        # Camp bookings always require admin approval (unless made by admin)
+        elif booking_type == 'camp':
             validated_data['status'] = 'Pending'
         else:
             # Determine booking status based on duration and number of rooms for regular bookings
