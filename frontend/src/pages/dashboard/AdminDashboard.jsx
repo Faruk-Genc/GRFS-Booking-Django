@@ -173,6 +173,25 @@ const AdminDashboard = () => {
     return `${displayHour}:00 ${period}`;
   };
 
+  const getBookingGenderClass = (booking) => {
+    const bookingType = booking?.booking_type;
+    if (!bookingType || bookingType.toString().toLowerCase() !== 'camp') {
+      return '';
+    }
+    const gender = booking?.user?.gender;
+    if (!gender) {
+      return '';
+    }
+    const normalizedGender = gender.toString().toLowerCase();
+    if (normalizedGender.startsWith('m')) {
+      return 'booking-gender-male';
+    }
+    if (normalizedGender.startsWith('f')) {
+      return 'booking-gender-female';
+    }
+    return '';
+  };
+
   const handleEditBooking = () => {
     if (!selectedBooking) return;
     
@@ -511,7 +530,7 @@ const AdminDashboard = () => {
                   {hourBookings.map(booking => (
                     <div 
                       key={booking.id} 
-                      className={`booking-event booking-${booking.status.toLowerCase()}`}
+                      className={`booking-event booking-${booking.status.toLowerCase()} ${getBookingGenderClass(booking)}`}
                       onClick={() => handleBookingClick(booking)}
                     >
                       <div className="booking-event-title">
@@ -560,7 +579,7 @@ const AdminDashboard = () => {
                     {hourBookings.map(booking => (
                       <div 
                         key={booking.id} 
-                        className={`booking-event booking-${booking.status.toLowerCase()}`}
+                      className={`booking-event booking-${booking.status.toLowerCase()} ${getBookingGenderClass(booking)}`}
                         onClick={() => handleBookingClick(booking)}
                       >
                         <div className="booking-event-title">
@@ -607,7 +626,7 @@ const AdminDashboard = () => {
                   {dayBookings.slice(0, 3).map(booking => (
                     <div 
                       key={booking.id} 
-                      className={`booking-event-small booking-${booking.status.toLowerCase()}`}
+                      className={`booking-event-small booking-${booking.status.toLowerCase()} ${getBookingGenderClass(booking)}`}
                       onClick={() => handleBookingClick(booking)}
                     >
                       <span className="booking-time-small">

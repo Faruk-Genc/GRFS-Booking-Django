@@ -471,6 +471,19 @@
   border-left: 3px solid #616161;
 }
 
+/* Gender-based booking colors (override status color) */
+.booking-event.booking-gender-male,
+.booking-event-small.booking-gender-male {
+  background: #2196f3;
+  border-left: 3px solid #1565c0;
+}
+
+.booking-event.booking-gender-female,
+.booking-event-small.booking-gender-female {
+  background: #e91e63;
+  border-left: 3px solid #ad1457;
+}
+
 /* Legend */
 .booking-legend {
   display: flex;
