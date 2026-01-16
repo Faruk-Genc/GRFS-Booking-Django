@@ -430,6 +430,10 @@
   overflow: hidden;
   max-width: 100%;
   box-sizing: border-box;
+  height: 36px;
+  min-height: 36px;
+  max-height: 36px;
+  flex: 0 0 auto;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
