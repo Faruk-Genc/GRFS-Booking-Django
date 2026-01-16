@@ -192,6 +192,15 @@ const AdminDashboard = () => {
     return '';
   };
 
+  const getBookingLocationLabel = (booking) => {
+    const bookingType = booking?.booking_type?.toString().toLowerCase();
+    if (bookingType === 'camp') {
+      const firstRoom = booking?.rooms?.[0];
+      return firstRoom?.floor?.name || 'Camp Booking';
+    }
+    return booking?.rooms?.map(r => r.name).join(', ') || '';
+  };
+
   const handleEditBooking = () => {
     if (!selectedBooking) return;
     
@@ -534,7 +543,7 @@ const AdminDashboard = () => {
                       onClick={() => handleBookingClick(booking)}
                     >
                       <div className="booking-event-title">
-                        {booking.rooms.map(r => r.name).join(', ')}
+                        {getBookingLocationLabel(booking)}
                       </div>
                       <div className="booking-event-details">
                         {formatTime(booking.start_datetime)} - {formatTime(booking.end_datetime)}
@@ -583,7 +592,7 @@ const AdminDashboard = () => {
                         onClick={() => handleBookingClick(booking)}
                       >
                         <div className="booking-event-title">
-                          {booking.rooms.map(r => r.name).join(', ')}
+                        {getBookingLocationLabel(booking)}
                         </div>
                         <div className="booking-event-time">
                           {formatTime(booking.start_datetime)} - {formatTime(booking.end_datetime)}
@@ -633,7 +642,7 @@ const AdminDashboard = () => {
                         {formatTime(booking.start_datetime)} - {formatTime(booking.end_datetime)}
                       </span>
                       <span className="booking-room-small">
-                        {booking.rooms.map(r => r.name).join(', ')} - {booking.user.first_name} {booking.user.last_name}
+                        {getBookingLocationLabel(booking)} - {booking.user.first_name} {booking.user.last_name}
                       </span>
                     </div>
                   ))}
