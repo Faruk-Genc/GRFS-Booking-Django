@@ -623,7 +623,7 @@ const AdminDashboard = () => {
               <div key={idx} className={`month-day-cell ${isToday ? 'today' : ''}`}>
                 <div className="month-day-number">{day.getDate()}</div>
                 <div className="month-day-bookings">
-                  {dayBookings.slice(0, 3).map(booking => (
+                  {dayBookings.map(booking => (
                     <div 
                       key={booking.id} 
                       className={`booking-event-small booking-${booking.status.toLowerCase()} ${getBookingGenderClass(booking)}`}
@@ -637,9 +637,6 @@ const AdminDashboard = () => {
                       </span>
                     </div>
                   ))}
-                  {dayBookings.length > 3 && (
-                    <div className="booking-more">+{dayBookings.length - 3} more</div>
-                  )}
                 </div>
               </div>
             );
