@@ -1,8 +1,10 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
+import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
+import ResetPasswordPage from './pages/auth/ResetPasswordPage';
 import Dashboard from './pages/dashboard/Dashboard';
 import PrivateRoute from './components/PrivateRoute';
 import AdminRoute from './components/AdminRoute';
@@ -15,9 +17,11 @@ function App() {
     <Router>
       <Navbar />
       <Routes>
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password/:uid/:token" element={<ResetPasswordPage />} />
+        <Route path="/" element={<BookingPage />} />
         <Route
           path="/dashboard"
           element={
@@ -26,22 +30,8 @@ function App() {
             </PrivateRoute>
           }
         />
-        <Route
-          path="/bookingpage"
-          element={
-            <PrivateRoute>
-              <BookingPage />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/booking-form"
-          element={
-            <PrivateRoute>
-              <BookingForm />
-            </PrivateRoute>
-          }
-        />
+        <Route path="/bookingpage" element={<BookingPage />} />
+        <Route path="/booking-form" element={<BookingForm />} />
         <Route
           path="/admin"
           element={
@@ -52,7 +42,7 @@ function App() {
             </PrivateRoute>
           }
         />
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/dev-edit" element={< BookingPage /> } />
       </Routes>
     </Router>
   );

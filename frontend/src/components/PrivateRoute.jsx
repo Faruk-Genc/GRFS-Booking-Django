@@ -38,7 +38,7 @@ const PrivateRoute = ({ children }) => {
   }, []);
 
   if (loading) {
-    return <div className="route-loading">Loading...</div>;
+    return <div>Loading...</div>; // Or a loading spinner component
   }
 
   return isAuthenticated ? children : <Navigate to="/login" />;

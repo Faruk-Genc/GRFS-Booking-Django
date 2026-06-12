@@ -1,7 +1,9 @@
 .dashboard-container {
   max-width: 1200px;
+  width: 100%;
   margin: 0 auto;
   padding: 30px 20px;
+  box-sizing: border-box;
 }
 
 .dashboard-container h1 {
@@ -42,6 +44,7 @@
   justify-content: space-between;
   align-items: center;
   gap: 20px;
+  flex-wrap: wrap;
 }
 
 .booking-card.past-booking {
@@ -77,6 +80,7 @@
 }
 
 .status-badge {
+  margin-right: 10px;
   padding: 6px 12px;
   border-radius: 20px;
   font-size: 12px;
@@ -96,21 +100,25 @@
 }
 
 .status-cancelled {
-  background-color: #e74c3c;
-  color: white;
+  background-color: #d40000;
+  color: #ffffff;
 }
 
 .booking-details {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 15px;
   margin-bottom: 20px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .booking-details-compact {
   display: flex;
   gap: 20px;
   flex-wrap: wrap;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .detail-item {
@@ -177,21 +185,21 @@
 }
 
 .btn-edit {
-  background-color: #3498db;
-  color: white;
+  background-color: #1a3970;
+  color: #ffffff;
 }
 
 .btn-edit:hover {
-  background-color: #2980b9;
+  background-color: #0f2447;
 }
 
 .btn-delete {
-  background-color: #e74c3c;
-  color: white;
+  background-color: #d40000;
+  color: #ffffff;
 }
 
 .btn-delete:hover {
-  background-color: #c0392b;
+  background-color: #a30000;
 }
 
 .btn-save {
@@ -248,7 +256,7 @@
 .edit-form input:focus,
 .edit-form select:focus {
   outline: none;
-  border-color: #3498db;
+  border-color: #1a3970;
 }
 
 .edit-form .date-input {
@@ -262,14 +270,14 @@
 }
 
 .edit-form .date-input:hover {
-  border-color: #3498db;
+  border-color: #1a3970;
   background-color: #f9f9f9;
-  box-shadow: 0 2px 4px rgba(52, 152, 219, 0.1);
+  box-shadow: 0 2px 4px rgba(26, 57, 112, 0.1);
 }
 
 .edit-form .date-input:focus {
-  border-color: #3498db;
-  box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2);
+  border-color: #1a3970;
+  box-shadow: 0 0 0 3px rgba(26, 57, 112, 0.2);
   background-color: #fff;
 }
 
@@ -291,7 +299,7 @@
   margin-top: 20px;
 }
 
-.dashboard-container .loading-message {
+.loading-message {
   text-align: center;
   padding: 10px;
   color: #7f8c8d;
@@ -333,17 +341,33 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
-.dashboard-container .error-message {
-  background-color: #ffebee;
-  color: #c62828;
+.error-message {
+  background-color: #ffe5e5;
+  color: #d40000;
   padding: 15px;
   border-radius: 5px;
   margin-bottom: 20px;
-  border-left: 4px solid #c62828;
+  border-left: 4px solid #d40000;
 }
 
 /* Responsive */
 @media (max-width: 768px) {
+  .dashboard-container {
+    padding: 20px 15px;
+  }
+
+  .dashboard-container h1 {
+    font-size: 28px;
+  }
+
+  .dashboard-container h2 {
+    font-size: 20px;
+  }
+
+  .booking-card {
+    padding: 12px 15px;
+  }
+
   .booking-card-content {
     flex-direction: column;
     align-items: flex-start;
@@ -379,22 +403,67 @@
   .btn-delete {
     width: 100%;
   }
+
+  .booking-top-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .booking-top-row .left-side,
+  .booking-top-row .right-side {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .dashboard-container {
+    padding: 15px 10px;
+  }
+
+  .dashboard-container h1 {
+    font-size: 24px;
+  }
+
+  .dashboard-container h2 {
+    font-size: 18px;
+  }
+
+  .booking-card {
+    padding: 10px 12px;
+  }
+
+  .detail-item strong,
+  .detail-item-compact strong {
+    font-size: 12px;
+  }
+
+  .detail-item span,
+  .detail-item-compact span {
+    font-size: 14px;
+  }
 }
 
 .booking-top-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .booking-top-row .left-side {
   display: flex;
   align-items: center;
   gap: 10px; /* space between room name + badge */
+  flex: 1;
+  min-width: 0;
 }
 
 .booking-top-row .right-side {
   display: flex;
   align-items: center;
   gap: 10px; /* space between buttons */
+  flex-wrap: wrap;
 }

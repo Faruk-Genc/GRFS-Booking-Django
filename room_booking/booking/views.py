@@ -2,6 +2,8 @@ from django.shortcuts import render
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions, generics
+from rest_framework import serializers
+from rest_framework.exceptions import AuthenticationFailed, ValidationError as DRFValidationError
 from .models import Booking, Room, Floor
 from .serializers import *
 from django.contrib.auth import get_user_model
@@ -11,14 +13,57 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from datetime import datetime, timedelta
 from django.db.models import Q
+from django.db import IntegrityError, DatabaseError
+from django.http import HttpResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods
+from django.conf import settings
 import pytz
 import logging
+import os
 
 # Create your views here.
 
 logger = logging.getLogger(__name__)
 
 User = get_user_model()
+
+# View to serve React app in production
+@csrf_exempt  # Exempt from CSRF since this is just serving static HTML
+def serve_react_app(request):
+    """Serve the React app's index.html for all non-API routes"""
+    # Only handle GET and HEAD requests
+    if request.method not in ['GET', 'HEAD']:
+        return HttpResponse('Method not allowed', status=405)
+    
+    try:
+        # Use Django's template system to render the template
+        # This is more reliable than manually reading the file
+        return render(request, 'index.html', {}, content_type='text/html')
+    except Exception as e:
+        # Fallback: try to read the file directly if template rendering fails
+        try:
+            template_path = os.path.join(settings.BASE_DIR, 'booking', 'templates', 'index.html')
+            if os.path.exists(template_path):
+                with open(template_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                    return HttpResponse(content, content_type='text/html; charset=utf-8')
+            else:
+                error_msg = f"React template not found at: {template_path}. BASE_DIR: {settings.BASE_DIR}"
+                logger.error(error_msg)
+                return HttpResponse(
+                    f"React app template not found. Please rebuild the frontend.\n{error_msg}",
+                    status=500,
+                    content_type='text/plain'
+                )
+        except Exception as e2:
+            error_msg = f"Error serving React app: {str(e)} (fallback also failed: {str(e2)})"
+            logger.error(error_msg, exc_info=True)
+            return HttpResponse(
+                f"Error loading React app: {str(e)}",
+                status=500,
+                content_type='text/plain'
+            )
 
 def check_booking_conflicts(room_ids, start_datetime, end_datetime, exclude_booking_id=None):
     """
@@ -104,10 +149,22 @@ class CreateBookingView(APIView):
             rooms = Room.objects.filter(is_active=True, id__in=room_ids)
             if rooms.count() != len(room_ids):
                 return Response(
-                    {"detail": "Some rooms are invalid or unavailable for booking."}, 
+                    {"detail": "Some rooms are invalid or unavailable for booking."},
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
+            # Get booking type (default to 'regular')
+            booking_type = request.data.get('booking_type', 'regular')
+            
+            # Check permissions for camp bookings
+            if booking_type == 'camp':
+                user_role = request.user.role
+                if user_role not in ['mentor', 'coordinator', 'admin']:
+                    return Response(
+                        {"detail": "Only mentors, coordinators, and admins can book camps."}, 
+                        status=status.HTTP_403_FORBIDDEN
+                    )
+            
             # Validate datetime fields
             start_datetime_str = request.data.get("start_datetime")
             end_datetime_str = request.data.get("end_datetime")
@@ -176,25 +233,28 @@ class CreateBookingView(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
-            # Validate maximum booking duration (e.g., 8 hours)
-            max_duration = timedelta(hours=8)
-            if (end_datetime - start_datetime) > max_duration:
-                return Response(
-                    {"detail": "Booking duration cannot exceed 8 hours."}, 
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            
-            # Validate minimum booking duration (e.g., 1 hour)
-            min_duration = timedelta(hours=1)
-            if (end_datetime - start_datetime) < min_duration:
-                return Response(
-                    {"detail": "Booking duration must be at least 1 hour."}, 
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+            # For camp bookings, skip duration validation (they can span multiple days)
+            if booking_type != 'camp':
+                # Validate maximum booking duration (e.g., 8 hours) for regular bookings
+                max_duration = timedelta(hours=8)
+                if (end_datetime - start_datetime) > max_duration:
+                    return Response(
+                        {"detail": "Booking duration cannot exceed 8 hours."}, 
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                
+                # Validate minimum booking duration (e.g., 1 hour) for regular bookings
+                min_duration = timedelta(hours=1)
+                if (end_datetime - start_datetime) < min_duration:
+                    return Response(
+                        {"detail": "Booking duration must be at least 1 hour."}, 
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
 
             # Check for booking conflicts - use database transaction to prevent race conditions
             from django.db import transaction
             with transaction.atomic():
+                # Check for conflicts (works for both regular and camp bookings)
                 conflicts = check_booking_conflicts(room_ids, start_datetime, end_datetime)
                 if conflicts:
                     # Format conflict details for user-friendly error message
@@ -220,18 +280,26 @@ class CreateBookingView(APIView):
                         status=status.HTTP_409_CONFLICT
                     )
 
-                # Create the booking with the selected rooms
-                # Pass datetime objects directly (serializer will handle them)
+                # Create the booking (single booking for both regular and camp bookings)
+                # For camp bookings, this will be one booking covering the entire time period
                 booking_data = {
                     "room_ids": room_ids,
                     "start_datetime": start_datetime,
                     "end_datetime": end_datetime,
-                    "status": "Pending",
+                    "booking_type": booking_type,
                 }
 
                 serializer = BookingSerializer(data=booking_data, context={'request': request})
                 if serializer.is_valid():
                     booking = serializer.save()  # Create booking
+                    
+                    # Send booking creation email
+                    try:
+                        from .email_utils import send_booking_creation_email
+                        send_booking_creation_email(booking)
+                    except Exception as e:
+                        logger.error(f"Failed to send booking creation email: {str(e)}")
+                    
                     return Response(serializer.data, status=status.HTTP_201_CREATED)
                 return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         except (ValueError, TypeError, AttributeError) as e:
@@ -293,9 +361,9 @@ class RoomListView(APIView):
                         {"detail": f"Floor with id {floor_id} does not exist."}, 
                         status=status.HTTP_404_NOT_FOUND
                     )
-                rooms = Room.objects.select_related('floor').filter(is_active=True, floor_id=floor_id)  # Filter rooms by floor
+                rooms = Room.objects.select_related('floor').filter(is_active=True, floor_id=floor_id)  # Filter active rooms by floor
             else:
-                rooms = Room.objects.select_related('floor').filter(is_active=True)  # Return all active rooms if no floor ID is provided
+                rooms = Room.objects.select_related('floor').filter(is_active=True)  # Return all active rooms
             serializer = RoomSerializer(rooms, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)
         except (ValueError, TypeError) as e:
@@ -484,9 +552,24 @@ class BookingDetailView(APIView):
                         status=status.HTTP_409_CONFLICT
                     )
             
+            # Store old data for email notification
+            old_data = {
+                'start_datetime': booking.start_datetime,
+                'end_datetime': booking.end_datetime,
+                'status': booking.status,
+            }
+            
             serializer = BookingSerializer(booking, data=data, partial=True, context={'request': request})
             if serializer.is_valid():
-                serializer.save()
+                updated_booking = serializer.save()
+                
+                # Send booking update email
+                try:
+                    from .email_utils import send_booking_update_email
+                    send_booking_update_email(updated_booking, updated_by_admin=False, old_data=old_data)
+                except Exception as e:
+                    logger.error(f"Failed to send booking update email: {str(e)}")
+                
                 return Response(serializer.data, status=status.HTTP_200_OK)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
             
@@ -516,6 +599,13 @@ class BookingDetailView(APIView):
             booking.status = 'Cancelled'
             booking.save()
             
+            # Send booking cancellation email
+            try:
+                from .email_utils import send_booking_cancellation_email
+                send_booking_cancellation_email(booking, cancelled_by_admin=False)
+            except Exception as e:
+                logger.error(f"Failed to send booking cancellation email: {str(e)}")
+            
             return Response(
                 {"detail": "Booking cancelled successfully."}, 
                 status=status.HTTP_200_OK
@@ -533,16 +623,128 @@ class RegisterView(generics.CreateAPIView):
     serializer_class = UserSerializer
     permission_classes = [permissions.AllowAny]
     
+    def create(self, request, *args, **kwargs):
+        try:
+            # Let DRF handle the request normally
+            response = super().create(request, *args, **kwargs)
+            return response
+        except DRFValidationError as e:
+            # DRF validation errors should return 400, not 500
+            logger.warning(f"Validation error in registration: {str(e)}")
+            return Response(
+                e.detail if hasattr(e, 'detail') else {"detail": str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except IntegrityError as e:
+            # Database integrity errors (unique constraints, etc.)
+            error_str = str(e).lower()
+            logger.error(f"Database integrity error in registration: {str(e)}", exc_info=True)
+            if 'email' in error_str and ('unique' in error_str or 'duplicate' in error_str):
+                return Response(
+                    {"detail": "An account with this email already exists."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            elif 'username' in error_str and ('unique' in error_str or 'duplicate' in error_str):
+                return Response(
+                    {"detail": "An account with this username already exists."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            else:
+                return Response(
+                    {"detail": "An account with this information already exists."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        except DatabaseError as e:
+            # General database errors (including connection errors)
+            error_str = str(e).lower()
+            logger.error(f"Database error in registration: {str(e)}", exc_info=True)
+            
+            # Check for connection errors
+            if 'name or service not known' in error_str or 'could not translate host name' in error_str:
+                return Response(
+                    {"detail": "Database connection failed. Please contact the administrator."},
+                    status=status.HTTP_503_SERVICE_UNAVAILABLE
+                )
+            else:
+                return Response(
+                    {"detail": "A database error occurred. Please try again later."},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+        except Exception as e:
+            # Catch any other unexpected errors
+            logger.error(f"Unexpected error in user registration: {str(e)}", exc_info=True)
+            error_str = str(e).lower()
+            if 'email' in error_str and 'unique' in error_str:
+                return Response(
+                    {"detail": "An account with this email already exists."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            elif 'username' in error_str and 'unique' in error_str:
+                return Response(
+                    {"detail": "An account with this username already exists."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            else:
+                return Response(
+                    {"detail": f"Registration failed: {str(e)}"},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+    
 class LoginSerializer(TokenObtainPairSerializer):
     @classmethod
     def get_token(cls, user):
-        token = super().get_token(user)
-        token['username'] = user.username
-        token['role'] = user.role
-        return token
+        try:
+            token = super().get_token(user)
+            # Safely add user attributes to token
+            if hasattr(user, 'username'):
+                token['username'] = user.username
+            else:
+                token['username'] = user.email  # Fallback to email if username not set
+            if hasattr(user, 'role'):
+                token['role'] = user.role
+            else:
+                token['role'] = 'user'  # Default role
+            return token
+        except Exception as e:
+            logger.error(f"Error generating token for user {user.email}: {str(e)}", exc_info=True)
+            raise
+    
+    def validate(self, attrs):
+        try:
+            data = super().validate(attrs)
+            user = self.user
+            
+            # Check if user is approved
+            if hasattr(user, 'approval_status'):
+                if user.approval_status == 'pending':
+                    raise AuthenticationFailed(
+                        "Your account is pending approval. Please wait for an admin to approve your account."
+                    )
+                elif user.approval_status == 'denied':
+                    raise AuthenticationFailed(
+                        "Your account has been denied. Please contact an administrator."
+                    )
+            
+            return data
+        except AuthenticationFailed:
+            # Re-raise authentication failures as-is
+            raise
+        except DatabaseError as e:
+            # Database connection errors
+            error_str = str(e).lower()
+            logger.error(f"Database error in login: {str(e)}", exc_info=True)
+            if 'name or service not known' in error_str or 'could not translate host name' in error_str:
+                raise AuthenticationFailed("Database connection failed. Please contact the administrator.")
+            else:
+                raise AuthenticationFailed("A database error occurred. Please try again later.")
+        except Exception as e:
+            # Log unexpected errors
+            logger.error(f"Error in login validation: {str(e)}", exc_info=True)
+            raise AuthenticationFailed("An error occurred during login. Please try again later.")
 
 class LoginView(TokenObtainPairView):
     serializer_class = LoginSerializer
+    permission_classes = [permissions.AllowAny]  # Allow unauthenticated access for login
     
 class UserDetailView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -565,12 +767,136 @@ class UserDetailView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+
+class PasswordResetRequestView(APIView):
+    """Request a password reset - sends email with reset token"""
+    permission_classes = [permissions.AllowAny]
+    
+    def post(self, request):
+        try:
+            email = request.data.get('email', '').strip().lower()
+            
+            if not email:
+                return Response(
+                    {"detail": "Email is required."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Try to find user by email
+            try:
+                user = User.objects.get(email=email)
+            except User.DoesNotExist:
+                # Don't reveal if email exists or not for security
+                # Still return success to prevent email enumeration
+                logger.info(f"Password reset requested for non-existent email: {email}")
+                return Response(
+                    {"detail": "If an account with that email exists, a password reset link has been sent."},
+                    status=status.HTTP_200_OK
+                )
+            
+            # Generate password reset token using Django's default token generator
+            from django.contrib.auth.tokens import default_token_generator
+            from django.utils.http import urlsafe_base64_encode
+            from django.utils.encoding import force_bytes
+            
+            token = default_token_generator.make_token(user)
+            uid = urlsafe_base64_encode(force_bytes(user.pk))
+            
+            # Send password reset email
+            try:
+                from .email_utils import send_password_reset_email
+                send_password_reset_email(user, token, uid)
+                logger.info(f"Password reset email sent to {user.email}")
+            except Exception as e:
+                logger.error(f"Failed to send password reset email: {str(e)}")
+                return Response(
+                    {"detail": "Failed to send password reset email. Please try again later."},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+            
+            # Return success (don't reveal if email exists)
+            return Response(
+                {"detail": "If an account with that email exists, a password reset link has been sent."},
+                status=status.HTTP_200_OK
+            )
+            
+        except Exception as e:
+            logger.error(f"Error in password reset request: {str(e)}", exc_info=True)
+            return Response(
+                {"detail": "An error occurred. Please try again later."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class PasswordResetConfirmView(APIView):
+    """Confirm password reset - validates token and sets new password"""
+    permission_classes = [permissions.AllowAny]
+    
+    def post(self, request):
+        try:
+            uid = request.data.get('uid', '').strip()
+            token = request.data.get('token', '').strip()
+            new_password = request.data.get('password', '').strip()
+            
+            if not uid or not token or not new_password:
+                return Response(
+                    {"detail": "UID, token, and password are required."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Validate password length
+            if len(new_password) < 8:
+                return Response(
+                    {"detail": "Password must be at least 8 characters long."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Decode user ID
+            from django.utils.http import urlsafe_base64_decode
+            from django.utils.encoding import force_str
+            
+            try:
+                user_id = force_str(urlsafe_base64_decode(uid))
+                user = User.objects.get(pk=user_id)
+            except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+                return Response(
+                    {"detail": "Invalid reset link. Please request a new password reset."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Validate token
+            from django.contrib.auth.tokens import default_token_generator
+            
+            if not default_token_generator.check_token(user, token):
+                return Response(
+                    {"detail": "Invalid or expired reset link. Please request a new password reset."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Set new password
+            user.set_password(new_password)
+            user.save()
+            
+            logger.info(f"Password reset successful for user {user.email}")
+            
+            return Response(
+                {"detail": "Password has been reset successfully. You can now log in with your new password."},
+                status=status.HTTP_200_OK
+            )
+            
+        except Exception as e:
+            logger.error(f"Error in password reset confirm: {str(e)}", exc_info=True)
+            return Response(
+                {"detail": "An error occurred. Please try again later."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
 class CheckAvailabilityView(APIView):
     """
     Check availability of rooms for a specific date.
     Returns available time slots for the given rooms on the specified date.
     """
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]  # Allow anyone to check availability
     
     def get(self, request):
         try:
@@ -645,8 +971,9 @@ class CheckAvailabilityView(APIView):
                     start_est = booking.start_datetime.astimezone(est)
                     end_est = booking.end_datetime.astimezone(est)
                     
-                    # Only include if booking is on the selected date
-                    if start_est.date() == check_date or end_est.date() == check_date:
+                    # Include booking if it overlaps with the check_date
+                    # This handles bookings that start before, end after, or span the check_date
+                    if start_est.date() <= check_date <= end_est.date():
                         # Use prefetched rooms instead of querying
                         for room in booking.rooms.all():
                             if room.id in room_ids:
@@ -659,13 +986,21 @@ class CheckAvailabilityView(APIView):
                                     'end_est': end_est,
                                 })
             
-            # Remove duplicates and format for response
+            # Remove duplicates and create separate lists for calculation and response
             seen_bookings = set()
+            booking_slots_for_calculation = []  # Keep datetime objects for hour checking
             for booking_info in bookings_list:
                 # Create a unique key for each booking
                 key = (booking_info['room_id'], booking_info['start_datetime'], booking_info['end_datetime'])
                 if key not in seen_bookings:
                     seen_bookings.add(key)
+                    # Store for hour calculation (with datetime objects)
+                    booking_slots_for_calculation.append({
+                        'room_id': booking_info['room_id'],
+                        'start_est': booking_info['start_est'],
+                        'end_est': booking_info['end_est'],
+                    })
+                    # Store for response (without datetime objects, only strings)
                     unavailable_slots.append({
                         'room_id': booking_info['room_id'],
                         'room_name': booking_info['room_name'],
@@ -681,14 +1016,25 @@ class CheckAvailabilityView(APIView):
             available_hours = []
             for hour in all_hours:
                 # Check if this hour is available for all requested rooms
-                unavailable_for_rooms = []
-                for slot in unavailable_slots:
-                    # Check if hour falls within the booking time range
-                    if slot['start_hour'] <= hour < slot['end_hour']:
-                        unavailable_for_rooms.append(slot)
+                unavailable_for_rooms = set()
                 
+                for slot in booking_slots_for_calculation:
+                    slot_start_est = slot['start_est']
+                    slot_end_est = slot['end_est']
+                    slot_room_id = slot['room_id']
+                    
+                    # Create datetime for this hour on the check_date
+                    hour_datetime = est.localize(datetime.combine(check_date, datetime.min.time().replace(hour=hour)))
+                    hour_end_datetime = hour_datetime + timedelta(hours=1)
+                    
+                    # Check if this hour overlaps with the booking
+                    # A booking blocks an hour if the booking overlaps with that hour slot
+                    # This properly handles camp bookings that span multiple days
+                    if slot_start_est < hour_end_datetime and slot_end_est > hour_datetime:
+                        unavailable_for_rooms.add(slot_room_id)
+                
+                # An hour is available if at least one requested room is not unavailable
                 if len(unavailable_for_rooms) < len(room_ids):
-                    # At least one room is available at this hour
                     available_hours.append(hour)
             
             return Response({
@@ -710,5 +1056,182 @@ class CheckAvailabilityView(APIView):
             logger.error(f"Error checking availability: {str(e)}", exc_info=True)
             return Response(
                 {"detail": "An error occurred while checking availability. Please try again later."}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+class PendingUsersView(APIView):
+    """View to list all pending users - Admin only"""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get(self, request):
+        try:
+            # Only admins can view pending users
+            if request.user.role != 'admin':
+                return Response(
+                    {"detail": "You do not have permission to view pending users."}, 
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            # Get all users with pending approval status
+            pending_users = User.objects.filter(approval_status='pending').order_by('-date_joined')
+            serializer = UserSerializer(pending_users, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except Exception as e:
+            logger.error(f"Error fetching pending users: {str(e)}", exc_info=True)
+            return Response(
+                {"detail": "An error occurred while fetching pending users."}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+class ApproveUserView(APIView):
+    """View to approve/deny users and assign roles - Admin only"""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def post(self, request, user_id):
+        try:
+            # Only admins can approve/deny users
+            if request.user.role != 'admin':
+                return Response(
+                    {"detail": "You do not have permission to approve users."}, 
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            user = get_object_or_404(User, id=user_id)
+            action = request.data.get('action')  # 'approve' or 'deny'
+            new_role = request.data.get('role', None)  # Optional role assignment
+            
+            if action == 'approve':
+                user.approval_status = 'approved'
+                # If role is provided, update it
+                if new_role and new_role in [choice[0] for choice in User.ROLE_CHOICES]:
+                    user.role = new_role
+                user.save()
+                
+                # Send approval email
+                try:
+                    from .email_utils import send_account_approval_email
+                    send_account_approval_email(user, approved=True)
+                except Exception as e:
+                    logger.error(f"Failed to send account approval email: {str(e)}")
+                
+                serializer = UserSerializer(user)
+                return Response(
+                    {"detail": "User approved successfully.", "user": serializer.data}, 
+                    status=status.HTTP_200_OK
+                )
+            elif action == 'deny':
+                user.approval_status = 'denied'
+                user.save()
+                
+                # Send denial email
+                try:
+                    from .email_utils import send_account_approval_email
+                    send_account_approval_email(user, approved=False)
+                except Exception as e:
+                    logger.error(f"Failed to send account denial email: {str(e)}")
+                
+                serializer = UserSerializer(user)
+                return Response(
+                    {"detail": "User denied successfully.", "user": serializer.data}, 
+                    status=status.HTTP_200_OK
+                )
+            else:
+                return Response(
+                    {"detail": "Invalid action. Use 'approve' or 'deny'."}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        except Exception as e:
+            logger.error(f"Error processing user approval: {str(e)}", exc_info=True)
+            return Response(
+                {"detail": "An error occurred while processing the request."}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+class UpdateBookingStatusView(APIView):
+    """View to update booking status - Admin only"""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def post(self, request, booking_id):
+        try:
+            # Only admins can update booking status
+            if request.user.role != 'admin':
+                return Response(
+                    {"detail": "You do not have permission to update booking status."}, 
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            booking = get_object_or_404(Booking, id=booking_id)
+            new_status = request.data.get('status')
+            
+            # Validate status
+            valid_statuses = ['Pending', 'Approved', 'Cancelled']
+            if new_status not in valid_statuses:
+                return Response(
+                    {"detail": f"Invalid status. Must be one of: {', '.join(valid_statuses)}"}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Store old status for email notification
+            old_status = booking.status
+            
+            # Update status
+            booking.status = new_status
+            booking.save()
+            
+            # Send email notification based on status change
+            try:
+                from .email_utils import send_booking_update_email, send_booking_cancellation_email
+                if new_status == 'Cancelled':
+                    send_booking_cancellation_email(booking, cancelled_by_admin=True)
+                else:
+                    old_data = {
+                        'start_datetime': booking.start_datetime,
+                        'end_datetime': booking.end_datetime,
+                        'status': old_status,
+                    }
+                    send_booking_update_email(booking, updated_by_admin=True, old_data=old_data)
+            except Exception as e:
+                logger.error(f"Failed to send booking status update email: {str(e)}")
+            
+            # Return updated booking
+            serializer = BookingSerializer(booking)
+            return Response(
+                {"detail": f"Booking status updated to {new_status}.", "booking": serializer.data}, 
+                status=status.HTTP_200_OK
+            )
+        except Exception as e:
+            logger.error(f"Error updating booking status: {str(e)}", exc_info=True)
+            return Response(
+                {"detail": "An error occurred while updating booking status."}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+class DeleteAllBookingsView(APIView):
+    """View to delete all bookings - Admin only"""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def delete(self, request):
+        try:
+            # Only admins can delete all bookings
+            if request.user.role != 'admin':
+                return Response(
+                    {"detail": "You do not have permission to delete all bookings."}, 
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            # Get count before deletion
+            booking_count = Booking.objects.count()
+            
+            # Delete all bookings
+            Booking.objects.all().delete()
+            
+            return Response(
+                {"detail": f"Successfully deleted {booking_count} booking(s)."}, 
+                status=status.HTTP_200_OK
+            )
+        except Exception as e:
+            logger.error(f"Error deleting all bookings: {str(e)}", exc_info=True)
+            return Response(
+                {"detail": "An error occurred while deleting all bookings."}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )

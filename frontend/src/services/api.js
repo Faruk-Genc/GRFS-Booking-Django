@@ -1,23 +1,67 @@
 import axios from 'axios';
 
+// Use environment variable for API URL, fallback to localhost for development
+// In Vite, use import.meta.env instead of process.env
+// Environment variables must be prefixed with VITE_ to be exposed to the client
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/';
+
+// Log API URL in development mode for debugging
+if (import.meta.env.DEV) {
+  console.log('🔧 Development Mode - API Base URL:', API_BASE_URL);
+  console.log('📝 Environment variable VITE_API_URL:', import.meta.env.VITE_API_URL || 'not set (using default)');
+} else {
+  // Log in production for debugging
+  console.log('🌐 Production Mode - API Base URL:', API_BASE_URL);
+}
+
 const API = axios.create({
-  baseURL: 'http://localhost:8000/api/',
+  baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  timeout: 10000, // 10 second timeout
 });
 
 // Automatically attach JWT token to every request if it exists
 API.interceptors.request.use((config) => {
   const token = localStorage.getItem('access');
-  if (token && !config.url.includes('auth/register')) {
+  if (token && !config.url.includes('auth/register') && !config.url.includes('auth/login')) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+  
+  // Ensure baseURL is properly set
+  if (!config.url.startsWith('http') && !config.baseURL) {
+    console.warn('⚠️ API request missing baseURL:', config.url);
+  }
+  
   return config;
 });
 
-// Handle token refresh on 401 errors
+// Handle token refresh on 401 errors and log errors for debugging
 API.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
+    
+    // Log error details for debugging
+    if (error.response) {
+      console.error('❌ API Error:', {
+        url: originalRequest.url,
+        method: originalRequest.method,
+        status: error.response.status,
+        statusText: error.response.statusText,
+        data: error.response.data,
+        fullURL: `${API_BASE_URL}${originalRequest.url}`
+      });
+    } else if (error.request) {
+      console.error('❌ API Request Error (no response):', {
+        url: originalRequest.url,
+        method: originalRequest.method,
+        fullURL: `${API_BASE_URL}${originalRequest.url}`
+      });
+    } else {
+      console.error('❌ API Error:', error.message);
+    }
     
     // If error is 401 and we haven't already retried
     if (error.response?.status === 401 && !originalRequest._retry) {
@@ -26,7 +70,7 @@ API.interceptors.response.use(
       try {
         const refreshToken = localStorage.getItem('refresh');
         if (refreshToken) {
-          const response = await axios.post('http://localhost:8000/api/auth/refresh/', {
+          const response = await axios.post(`${API_BASE_URL}auth/refresh/`, {
             refresh: refreshToken
           });
           const { access } = response.data;
@@ -96,4 +140,28 @@ export const deleteBooking = async (bookingId) => {
 
 export const getAllBookings = async () => {
   return await API.get('bookings/');
+};
+
+export const getPendingUsers = async () => {
+  return await API.get('admin/pending-users/');
+};
+
+export const approveUser = async (userId, action, role = null) => {
+  return await API.post(`admin/approve-user/${userId}/`, { action, role });
+};
+
+export const updateBookingStatus = async (bookingId, status) => {
+  return await API.post(`admin/bookings/${bookingId}/status/`, { status });
+};
+
+export const deleteAllBookings = async () => {
+  return await API.delete('admin/bookings/delete-all/');
+};
+
+export const requestPasswordReset = async (data) => {
+  return await API.post('auth/password-reset/', data);
+};
+
+export const confirmPasswordReset = async (data) => {
+  return await API.post('auth/password-reset-confirm/', data);
 };

@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 from pathlib import Path
 import os
 from dotenv import load_dotenv
+import dj_database_url
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -34,7 +35,25 @@ if not SECRET_KEY:
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DEBUG', 'True').lower() == 'true'
 
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '').split(',') if os.getenv('ALLOWED_HOSTS') else []
+# ALLOWED_HOSTS configuration
+# In production, this must be set to your domain(s)
+# For Render, set it to: your-app-name.onrender.com
+ALLOWED_HOSTS_ENV = os.getenv('ALLOWED_HOSTS', '')
+if ALLOWED_HOSTS_ENV:
+    # Split by comma and strip whitespace
+    ALLOWED_HOSTS = [host.strip() for host in ALLOWED_HOSTS_ENV.split(',') if host.strip()]
+else:
+    # Default to empty list (will cause 400 errors in production if not set)
+    ALLOWED_HOSTS = []
+    
+# Log warning if ALLOWED_HOSTS is empty in production
+if not DEBUG and not ALLOWED_HOSTS:
+    import warnings
+    warnings.warn(
+        "ALLOWED_HOSTS is empty in production. This will cause 400 Bad Request errors. "
+        "Set ALLOWED_HOSTS environment variable with your domain(s).",
+        UserWarning
+    )
 
 
 # Application definition
@@ -54,6 +73,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',  # Add whitenoise for static files
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -79,7 +99,7 @@ ROOT_URLCONF = 'room_booking.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [os.path.join(BASE_DIR, 'booking', 'templates')],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -97,16 +117,71 @@ WSGI_APPLICATION = 'room_booking.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv('DB_NAME', 'room_booking'),
-        'USER': os.getenv('DB_USER', 'room_admin'),
-        'PASSWORD': os.getenv('DB_PASSWORD'),  # Must be set in environment
-        'HOST': os.getenv('DB_HOST', 'localhost'),
-        'PORT': os.getenv('DB_PORT', '5432'),
+# Support both PostgreSQL and MySQL (Render uses PostgreSQL)
+
+
+DATABASE_URL = os.getenv("DATABASE_URL")
+DB_ENGINE = os.getenv('DB_ENGINE', 'postgresql').lower()
+
+if DATABASE_URL:
+    # Parse DATABASE_URL - Render provides connection strings with SSL already configured
+    # Render databases require SSL, which is typically included in the connection string
+    try:
+        # Parse the database URL with connection pooling
+        db_config = dj_database_url.parse(
+            DATABASE_URL, 
+            conn_max_age=600  # Keep connections alive for 10 minutes
+        )
+        
+        # Ensure OPTIONS dict exists for additional settings
+        if 'OPTIONS' not in db_config:
+            db_config['OPTIONS'] = {}
+        
+        # Add connection timeout for production
+        if not DEBUG:
+            # Set a reasonable connection timeout (10 seconds)
+            db_config['OPTIONS']['connect_timeout'] = 10
+        
+        DATABASES = {
+            "default": db_config
+        }
+    except Exception as e:
+        # Log database configuration error but don't fail silently
+        import warnings
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error parsing DATABASE_URL: {str(e)}")
+        warnings.warn(
+            f"Error parsing DATABASE_URL: {str(e)}. "
+            "Falling back to individual database environment variables.",
+            UserWarning
+        )
+        # Fallback to individual environment variables
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.postgresql',
+                'NAME': os.getenv('DB_NAME', 'room_booking'),
+                'USER': os.getenv('DB_USER', 'room_admin'),
+                'PASSWORD': os.getenv('DB_PASSWORD'),
+                'HOST': os.getenv('DB_HOST', 'localhost'),
+                'PORT': os.getenv('DB_PORT', '5432'),
+                'OPTIONS': {
+                    'connect_timeout': 10,
+                },
+            }
+        }
+else:
+    # Local fallback (if no DATABASE_URL is set)
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.getenv('DB_NAME', 'room_booking'),
+            'USER': os.getenv('DB_USER', 'room_admin'),
+            'PASSWORD': os.getenv('DB_PASSWORD'),
+            'HOST': os.getenv('DB_HOST', 'localhost'),
+            'PORT': os.getenv('DB_PORT', '5432'),
+        }
     }
-}
 
 
 # Password validation
@@ -145,7 +220,15 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+
+# WhiteNoise configuration for serving static files
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
+# Media files (user uploads)
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
@@ -172,8 +255,61 @@ REST_FRAMEWORK = {
     }
 }
 
+# CORS Settings
 CORS_ALLOWED_ORIGINS = os.getenv(
     'CORS_ALLOWED_ORIGINS', 
     'http://localhost:3000'
 ).split(',') if os.getenv('CORS_ALLOWED_ORIGINS') else ["http://localhost:3000"]
+
+# Allow credentials for CORS
+CORS_ALLOW_CREDENTIALS = True
+
+# Additional CORS settings for production
+if not DEBUG:
+    CORS_ALLOWED_ORIGINS = os.getenv('CORS_ALLOWED_ORIGINS', '').split(',') if os.getenv('CORS_ALLOWED_ORIGINS') else []
+    # If no CORS origins specified in production, allow from same origin
+    if not CORS_ALLOWED_ORIGINS:
+        CORS_ALLOWED_ORIGINS = [f"https://{host}" for host in ALLOWED_HOSTS if host]
+
+# Email Configuration
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '').strip()
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '').strip()
+
+# Only use SMTP backend if email credentials are configured
+# Otherwise use console backend to prevent connection errors
+if EMAIL_HOST_USER and EMAIL_HOST_PASSWORD:
+    EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.smtp.EmailBackend')
+    EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
+    EMAIL_PORT = int(os.getenv('EMAIL_PORT', '587'))
+    EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True').lower() == 'true'
+    EMAIL_USE_SSL = os.getenv('EMAIL_USE_SSL', 'False').lower() == 'true'
+    DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', '').strip() or EMAIL_HOST_USER
+else:
+    # Use console backend when email is not configured to prevent connection errors
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+    EMAIL_HOST = ''
+    EMAIL_PORT = 587
+    EMAIL_USE_TLS = False
+    EMAIL_USE_SSL = False
+    DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'noreply@example.com').strip()
+    import warnings
+    warnings.warn(
+        "Email configuration incomplete: EMAIL_HOST_USER and/or EMAIL_HOST_PASSWORD not set. "
+        "Using console email backend. Email notifications will be logged to console only.",
+        UserWarning
+    )
+
+SERVER_EMAIL = DEFAULT_FROM_EMAIL
+
+# Site URL for email links (used in email templates)
+# Fallback logic: use SITE_URL env var, or construct from ALLOWED_HOSTS, or use localhost
+if os.getenv('SITE_URL'):
+    SITE_URL = os.getenv('SITE_URL').strip()
+elif not DEBUG and ALLOWED_HOSTS:
+    # In production, use first allowed host with https
+    host = ALLOWED_HOSTS[0].strip()
+    SITE_URL = f"https://{host}" if not host.startswith('http') else host
+else:
+    # Development fallback
+    SITE_URL = 'http://localhost:8000'
 
