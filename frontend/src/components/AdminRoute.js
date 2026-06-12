@@ -1,53 +1,39 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Navigate } from 'react-router-dom';
 import { getUser } from '../services/api';
 
 const AdminRoute = ({ children }) => {
-  const [isAdmin, setIsAdmin] = useState(null);
+  const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
 
   useEffect(() => {
     const checkAdmin = async () => {
       try {
-        const token = localStorage.getItem('access');
-        if (!token) {
-          navigate('/login');
-          return;
-        }
-
         const response = await getUser();
-        if (response.data.role === 'admin') {
-          setIsAdmin(true);
-        } else {
-          setIsAdmin(false);
-          navigate('/dashboard');
-        }
+        setUser(response.data);
       } catch (err) {
-        setIsAdmin(false);
-        navigate('/login');
+        setUser(null);
       } finally {
         setLoading(false);
       }
     };
 
     checkAdmin();
-  }, [navigate]);
+  }, []);
 
   if (loading) {
-    return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-        <div>Loading...</div>
-      </div>
-    );
+    return <div className="route-loading">Loading...</div>;
   }
 
-  if (!isAdmin) {
-    return null;
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (user.role !== 'admin') {
+    return <Navigate to="/dashboard" replace />;
   }
 
   return children;
 };
 
 export default AdminRoute;
-

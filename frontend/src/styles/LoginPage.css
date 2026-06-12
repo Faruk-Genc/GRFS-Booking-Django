@@ -41,7 +41,7 @@
   .login-container button:hover {
     background-color: #437e51;
   }
-  .error-message {
+  .login-container .error-message {
     color: red;
     text-align: center;
     margin-top: 15px;
@@ -55,21 +55,21 @@
     flex-direction: column;
   }
   
-  .auth-link {
+  .login-container .auth-link {
     text-align: center;
     margin-top: 20px;
     color: #666;
     font-size: 14px;
   }
   
-  .auth-link a {
+  .login-container .auth-link a {
     color: #70bd85;
     text-decoration: none;
     font-weight: 600;
     transition: color 0.3s ease;
   }
   
-  .auth-link a:hover {
+  .login-container .auth-link a:hover {
     color: #70bd85;
     text-decoration: underline;
   }

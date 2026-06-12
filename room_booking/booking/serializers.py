@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from .models import Booking, Room, Floor
 from django.contrib.auth import get_user_model
+from django.db.models import Q
 
 User = get_user_model()
 
@@ -61,19 +62,27 @@ class RoomSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Room
-        fields = ['id', 'name', 'floor', 'floor_id']
+        fields = ['id', 'name', 'floor', 'floor_id', 'is_active']
+        read_only_fields = ['is_active']
 
 class BookingSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
     rooms = RoomSerializer(many=True, read_only=True)
     room_ids = serializers.PrimaryKeyRelatedField(
-        queryset=Room.objects.all(), many=True, write_only=True, source='rooms', required=False
+        queryset=Room.objects.filter(is_active=True), many=True, write_only=True, source='rooms', required=False
     )
 
     class Meta:
         model = Booking
         fields = ['id', 'user', 'rooms', 'room_ids', 'start_datetime', 'end_datetime', 'status', 'created_at']
         read_only_fields = ['status', 'user', 'created_at']  # Status and user cannot be set via API
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if isinstance(self.instance, Booking):
+            self.fields['room_ids'].queryset = Room.objects.filter(
+                Q(is_active=True) | Q(bookings=self.instance)
+            ).distinct()
     
     def update(self, instance, validated_data):
         """Update booking instance"""
@@ -105,28 +114,8 @@ class BookingSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         """Automatically assign the logged-in user when creating a booking"""
-        from datetime import timedelta
-        
         user = self.context['request'].user
         validated_data['user'] = user
-        
-        # Determine booking status based on duration and number of rooms
-        # Auto-approve if: duration < 6 hours AND rooms <= 2
-        # Otherwise, require manual approval (Pending)
-        start_datetime = validated_data.get('start_datetime')
-        end_datetime = validated_data.get('end_datetime')
-        rooms = validated_data.get('rooms', [])  # room_ids maps to 'rooms' via source, returns Room objects
-        
-        if start_datetime and end_datetime:
-            booking_duration = end_datetime - start_datetime
-            duration_hours = booking_duration.total_seconds() / 3600
-            num_rooms = len(rooms) if rooms else 0
-            
-            if duration_hours < 6 and num_rooms <= 2:
-                validated_data['status'] = 'Approved'
-            else:
-                validated_data['status'] = 'Pending'
-        else:
-            validated_data['status'] = 'Pending'
-        
+        # Ensure status is always 'Pending' for new bookings
+        validated_data['status'] = 'Pending'
         return super().create(validated_data)

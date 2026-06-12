@@ -37,6 +37,7 @@ class Floor(models.Model):
 class Room(models.Model):
     name = models.CharField(max_length=100)
     floor = models.ForeignKey(Floor, on_delete=models.CASCADE, related_name="rooms")
+    is_active = models.BooleanField(default=True, db_index=True)
 
     def __str__(self):
         return f"{self.name} (Floor {self.floor.name})"

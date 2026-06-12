@@ -1,11 +1,12 @@
 import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { getUser } from '../services/api';
 import { useEffect, useState } from 'react';
 import '../styles/Navbar.css';
 
 const Navbar = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [user, setUser] = useState(null);
 
   useEffect(() => {
@@ -19,13 +20,16 @@ const Navbar = () => {
       }
     };
     fetchUser();
-  }, []);
+  }, [location.pathname]);
 
   const handleLogout = () => {
     localStorage.removeItem('access');
     localStorage.removeItem('refresh');
+    setUser(null);
     navigate('/login');
   };
+
+  const displayName = user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.username || user.email : '';
 
   return (
     <nav className="navbar">
@@ -42,7 +46,7 @@ const Navbar = () => {
                 <Link to="/admin" className="navbar-link">Admin</Link>
               )}
               <div className="navbar-user">
-                <span className="navbar-username">{user.first_name} {user.last_name}</span>
+                <span className="navbar-username">{displayName}</span>
                 <button onClick={handleLogout} className="navbar-logout">Logout</button>
               </div>
             </>

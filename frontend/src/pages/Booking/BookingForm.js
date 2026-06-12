@@ -152,7 +152,7 @@ const BookingForm = () => {
       const startDatetime = `${selectedDate}T${String(startHour).padStart(2, '0')}:00:00`;
       const endDatetime = `${endDate}T${String(endHour).padStart(2, '0')}:00:00`;
 
-      const response = await createBooking({
+      await createBooking({
         room_ids: roomIds,
         start_datetime: startDatetime,
         end_datetime: endDatetime,

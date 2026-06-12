@@ -74,6 +74,8 @@ class CreateBookingView(APIView):
         try:
             # Extract room_ids and floor_id from the request data
             room_ids = request.data.get('room_ids', [])
+            if not isinstance(room_ids, list):
+                room_ids = [room_ids]
             floor_id = request.data.get('floor_id', None)
 
             # If no rooms are selected, return an error
@@ -87,7 +89,7 @@ class CreateBookingView(APIView):
             if floor_id:
                 try:
                     floor = Floor.objects.get(id=floor_id)
-                    floor_rooms = floor.rooms.all()  # Get all rooms for the selected floor
+                    floor_rooms = floor.rooms.filter(is_active=True)  # Get all active rooms for the selected floor
                     room_ids.extend([room.id for room in floor_rooms])  # Add floor rooms to the selected rooms list
                 except Floor.DoesNotExist:
                     return Response(
@@ -98,11 +100,11 @@ class CreateBookingView(APIView):
             # Remove duplicates from room_ids (in case both floor and individual rooms are selected)
             room_ids = list(set(room_ids))
 
-            # Ensure that the room_ids provided are valid rooms
-            rooms = Room.objects.filter(id__in=room_ids)
-            if len(rooms) != len(room_ids):
+            # Ensure that the room_ids provided are valid, active rooms
+            rooms = Room.objects.filter(is_active=True, id__in=room_ids)
+            if rooms.count() != len(room_ids):
                 return Response(
-                    {"detail": "Some rooms are invalid."}, 
+                    {"detail": "Some rooms are invalid or unavailable for booking."}, 
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
@@ -220,11 +222,11 @@ class CreateBookingView(APIView):
 
                 # Create the booking with the selected rooms
                 # Pass datetime objects directly (serializer will handle them)
-                # Status will be auto-determined in the serializer based on duration and room count
                 booking_data = {
                     "room_ids": room_ids,
                     "start_datetime": start_datetime,
                     "end_datetime": end_datetime,
+                    "status": "Pending",
                 }
 
                 serializer = BookingSerializer(data=booking_data, context={'request': request})
@@ -291,9 +293,9 @@ class RoomListView(APIView):
                         {"detail": f"Floor with id {floor_id} does not exist."}, 
                         status=status.HTTP_404_NOT_FOUND
                     )
-                rooms = Room.objects.select_related('floor').filter(floor_id=floor_id)  # Filter rooms by floor
+                rooms = Room.objects.select_related('floor').filter(is_active=True, floor_id=floor_id)  # Filter rooms by floor
             else:
-                rooms = Room.objects.select_related('floor').all()  # Return all rooms if no floor ID is provided
+                rooms = Room.objects.select_related('floor').filter(is_active=True)  # Return all active rooms if no floor ID is provided
             serializer = RoomSerializer(rooms, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)
         except (ValueError, TypeError) as e:
@@ -602,6 +604,13 @@ class CheckAvailabilityView(APIView):
             except ValueError:
                 return Response(
                     {"detail": "Invalid room_ids format"}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            active_room_count = Room.objects.filter(is_active=True, id__in=room_ids).count()
+            if active_room_count != len(set(room_ids)):
+                return Response(
+                    {"detail": "Some rooms are invalid or unavailable for booking."},
                     status=status.HTTP_400_BAD_REQUEST
                 )
             

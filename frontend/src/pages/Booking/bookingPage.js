@@ -49,7 +49,7 @@ const BookingPage = () => {
 
   const toggleFloor = (floorId, e) => {
     // Prevent the header from collapsing when the "Book Entire Floor" button is clicked
-    if (e.target.classList.contains('book-floor-btn')) return;
+    if (e.target.closest('.book-floor-btn')) return;
 
     // Toggle the active floor state, allow multiple floors to stay open
     setActiveFloors((prev) => ({
@@ -84,8 +84,8 @@ const BookingPage = () => {
     // Only proceed if we have valid rooms
     if (rooms && Array.isArray(rooms) && rooms.length > 0) {
       const roomsForFloor = rooms.map((room) => room.id);
-      setSelectedRooms((prev) => [...prev, ...roomsForFloor]);
-      setSelectedFloors((prev) => [...prev, floorId]);
+      setSelectedRooms((prev) => [...new Set([...prev, ...roomsForFloor])]);
+      setSelectedFloors((prev) => [...new Set([...prev, floorId])]);
     } else {
       setError('Unable to fetch rooms for this floor. Please try again.');
     }
@@ -101,7 +101,7 @@ const BookingPage = () => {
   };
 
   return (
-    <div className="container">
+    <div className="booking-page">
       <h2>Building Rooms</h2>
 
       {error && (
@@ -113,15 +113,26 @@ const BookingPage = () => {
       {loading && <div className="loading-message">Loading floors...</div>}
 
       <div className="accordion">
-        {floors.map((floor) => (
+        {floors.length === 0 && !loading && (
+          <div className="empty-message">No floors available.</div>
+        )}
+
+        {floors.map((floor, index) => (
           <div key={floor.id} className="floor">
             <div
-              className="floor-header"
+              className={`floor-header floor-header-${index % 4}`}
               
               onClick={(e) => toggleFloor(floor.id, e)} // Pass the event to prevent collapsing
             >
               <h3>{floor.name}</h3>
-              <button className="book-floor-btn" onClick={() => handleFloorBooking(floor.id)}>
+              <button
+                type="button"
+                className="book-floor-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleFloorBooking(floor.id);
+                }}
+              >
                 Book Entire Floor
               </button>
             </div>
@@ -133,13 +144,14 @@ const BookingPage = () => {
                     fetchedRooms[floor.id].map((room) => (
                       <li key={room.id} className="room-item" onClick={() => handleRoomSelection(room.id)}>
                         <div className="room-content">
-                          <img src={room.image} alt={room.name} className="room-image" />
+                          <span className="room-marker" aria-hidden="true"></span>
                           <span className="room-name">{room.name}</span>
                         </div>
                         <input
                           type="checkbox"
                           id={`room-${room.id}`}
-                          onChange={(e) => handleRoomSelection(room.id)} // This ensures it can also be toggled via the checkbox
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={() => handleRoomSelection(room.id)} // This ensures it can also be toggled via the checkbox
                           checked={selectedRooms.includes(room.id)}
                         />
                       </li>
