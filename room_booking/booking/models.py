@@ -22,6 +22,18 @@ class CustomUser(AbstractUser):
         ('female', 'Female'),
     ]
     gender = models.CharField(max_length=10, choices=GENDER_CHOICES, blank=True, null=True)
+    
+    APPROVAL_STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('approved', 'Approved'),
+        ('denied', 'Denied'),
+    ]
+    approval_status = models.CharField(
+        max_length=20, 
+        choices=APPROVAL_STATUS_CHOICES, 
+        default='pending',
+        db_index=True
+    )
 
     def __str__(self):
         return f"{self.username} ({self.role})"
@@ -59,6 +71,16 @@ class Booking(models.Model):
         ],
         default="Pending",
         db_index=True,  # Add index for faster filtering
+    )
+    BOOKING_TYPE_CHOICES = [
+        ('regular', 'Regular'),
+        ('camp', 'Camp'),
+    ]
+    booking_type = models.CharField(
+        max_length=20,
+        choices=BOOKING_TYPE_CHOICES,
+        default='regular',
+        db_index=True,
     )
     created_at = models.DateTimeField(auto_now_add=True)
 

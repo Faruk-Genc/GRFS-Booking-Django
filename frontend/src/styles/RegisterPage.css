@@ -6,6 +6,7 @@
     border-radius: 8px;
     background-color: #f4f4f4;
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    box-sizing: border-box;
   }
   .register-container h2 {
     text-align: center;
@@ -20,12 +21,58 @@
     box-sizing: border-box;
     font-size: 16px;
     font-family: inherit;
+    max-width: 100%;
+  }
+  
+  .password-input-wrapper {
+    position: relative;
+    width: 100%;
+    margin: 10px 0;
+  }
+  
+  .password-input-wrapper input {
+    width: 100%;
+    padding-right: 45px;
+    margin: 0;
+  }
+  
+  .password-toggle-btn {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 5px 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #666;
+    transition: color 0.2s ease;
+    z-index: 10;
+  }
+  
+  .password-toggle-btn:hover {
+    color: #1a3970;
+  }
+  
+  .password-toggle-btn:focus {
+    outline: 2px solid #1a3970;
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+  
+  .password-toggle-btn svg {
+    width: 20px;
+    height: 20px;
+    display: block;
   }
   
   .register-container input:focus {
     outline: none;
-    border-color: #4CAF50;
-    box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
+    border-color: #1a3970;
+    box-shadow: 0 0 0 2px rgba(26, 57, 112, 0.2);
   }
   
   .register-container select,
@@ -40,28 +87,30 @@
     font-family: inherit;
     background-color: white;
     cursor: pointer;
+    max-width: 100%;
   }
   
   .register-container select:focus,
   .register-container .form-select:focus {
     outline: none;
-    border-color: #4CAF50;
-    box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
+    border-color: #1a3970;
+    box-shadow: 0 0 0 2px rgba(26, 57, 112, 0.2);
   }
-  .register-container button {
+  .register-container button[type="submit"] {
     width: 100%;
     padding: 12px;
-    background-color: #70bd85;
-    color: white;
+    background-color: #1a3970;
+    color: #ffffff;
     border: none;
     border-radius: 4px;
     font-size: 16px;
     cursor: pointer;
+    margin-top: 10px;
   }
-  .register-container button:hover {
-    background-color: #437e51;
+  .register-container button[type="submit"]:hover {
+    background-color: #0f2447;
   }
-  .register-container .success-message {
+  .success-message {
     color: green;
     text-align: center;
     margin-top: 15px;
@@ -75,21 +124,47 @@
     flex-direction: column;
   }
   
-  .register-container .auth-link {
+  .auth-link {
     text-align: center;
     margin-top: 20px;
     color: #666;
     font-size: 14px;
   }
   
-  .register-container .auth-link a {
-    color: #70bd85;
+  .auth-link a {
+    color: #1a3970;
     text-decoration: none;
     font-weight: 600;
     transition: color 0.3s ease;
   }
   
-  .register-container .auth-link a:hover {
-    color: #70bd85;
+  .auth-link a:hover {
+    color: #d40000;
     text-decoration: underline;
+  }
+
+  @media (max-width: 480px) {
+    .register-container {
+      width: 100%;
+      max-width: 100%;
+      margin: 50px auto;
+      padding: 20px;
+      border-radius: 0;
+    }
+
+    .register-container h2 {
+      font-size: 24px;
+    }
+
+    .register-container input,
+    .register-container select,
+    .register-container .form-select {
+      font-size: 16px; /* Prevents zoom on iOS */
+      padding: 12px;
+    }
+
+    .register-container button[type="submit"] {
+      font-size: 16px; /* Prevents zoom on iOS */
+      padding: 12px;
+    }
   }

@@ -1,0 +1,159 @@
+services:
+  # Django Backend Service
+  - type: web
+    name: GRFS Room Booking
+    env: python
+    plan: starter
+    buildCommand: |
+      set -e
+      echo "Starting build process..."
+      pwd
+      ls -la
+
+      echo "Checking for frontend directory..."
+      if [ ! -d "frontend" ]; then
+        echo "ERROR: frontend directory not found in current directory"
+        echo "Current directory contents:"
+        ls -la
+        exit 1
+      fi
+
+      cd frontend
+      echo "Frontend directory found, checking package.json..."
+      if [ ! -f "package.json" ]; then
+        echo "ERROR: package.json not found in frontend directory"
+        echo "Frontend directory contents:"
+        ls -la
+        exit 1
+      fi
+
+      echo "Installing npm dependencies..."
+      npm install
+
+      echo "Building React app..."
+      CI=false VITE_API_URL=/api/ npm run build
+      cd ..
+
+      echo "Creating directories for static files..."
+      # IMPORTANT: STATIC_ROOT should be the direct target (no extra /static folder)
+      mkdir -p room_booking/staticfiles
+      mkdir -p room_booking/booking/templates
+
+      echo "Copying React build files..."
+      if [ ! -f "frontend/build/index.html" ]; then
+        echo "ERROR: React index.html missing. Build failed."
+        ls -la frontend/build/
+        exit 1
+      fi
+
+      # Copy static directory contents (Vite outputs to 'static' directory)
+      if [ -d "frontend/build/static" ]; then
+        cp -r frontend/build/static/* room_booking/staticfiles/
+      fi
+      
+      # Copy other files from build root (favicon, manifest, robots.txt, logo, etc.)
+      find frontend/build -maxdepth 1 -type f ! -name "index.html" -exec cp {} room_booking/staticfiles/ \;
+      
+      # Copy rooms directory if it exists (room images from public/rooms/)
+      if [ -d "frontend/build/rooms" ]; then
+        echo "Copying room images..."
+        cp -r frontend/build/rooms room_booking/staticfiles/
+      fi
+      
+      # Copy other assets (favicon, manifest, robots.txt, etc.)
+      if [ -f "frontend/build/favicon.ico" ]; then
+        cp frontend/build/favicon.ico room_booking/staticfiles/
+      fi
+      if [ -f "frontend/build/manifest.json" ]; then
+        cp frontend/build/manifest.json room_booking/staticfiles/
+      fi
+      if [ -f "frontend/build/robots.txt" ]; then
+        cp frontend/build/robots.txt room_booking/staticfiles/
+      fi
+      if [ -f "frontend/build/grfs-logo.png" ]; then
+        cp frontend/build/grfs-logo.png room_booking/staticfiles/
+      fi
+
+      # Copy React index.html into Django templates
+      cp frontend/build/index.html room_booking/booking/templates/
+
+      echo "Installing Python dependencies..."
+      pip install -r room_booking/requirements.txt
+
+      cd room_booking
+
+      echo "Collecting static files..."
+      echo "Note: collectstatic requires SECRET_KEY. If not set, will skip (static files already copied from React build)"
+      set +e  # Allow collectstatic to fail without stopping build
+      python manage.py collectstatic --noinput 2>&1 || {
+        echo "WARNING: collectstatic failed (SECRET_KEY may not be set during build)."
+        echo "This is normal - static files from React build have already been copied manually."
+        echo "collectstatic can be run manually after deployment if needed."
+      }
+      set -e  # Re-enable exit on error
+
+      echo "Build completed successfully!"
+    preDeployCommand: cd room_booking && python manage.py migrate --noinput
+    startCommand: cd room_booking && gunicorn room_booking.wsgi:application --bind 0.0.0.0:$PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.0
+      - key: NODE_VERSION
+        value: 22.x
+      - key: DATABASE_URL
+        sync: false
+      - key: SECRET_KEY
+        sync: false
+      - key: DEBUG
+        value: False
+      - key: ALLOWED_HOSTS
+        sync: false
+      - key: DB_ENGINE
+        value: postgresql
+      - key: DB_NAME
+        fromDatabase:
+          name: grfs-booking-db
+          property: database
+      - key: DB_USER
+        fromDatabase:
+          name: grfs-booking-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: grfs-booking-db
+          property: password
+      - key: DB_HOST
+        fromDatabase:
+          name: grfs-booking-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: grfs-booking-db
+          property: port
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+      - key: EMAIL_BACKEND
+        value: django.core.mail.backends.smtp.EmailBackend
+      - key: EMAIL_HOST
+        sync: false
+      - key: EMAIL_PORT
+        value: 587
+      - key: EMAIL_USE_TLS
+        value: True
+      - key: EMAIL_USE_SSL
+        value: False
+      - key: EMAIL_HOST_USER
+        sync: false
+      - key: EMAIL_HOST_PASSWORD
+        sync: false
+      - key: DEFAULT_FROM_EMAIL
+        sync: false
+      - key: SITE_URL
+        sync: false
+
+databases:
+  - name: grfs-booking-db
+    plan: basic-256mb
+    databaseName: grfs_booking
+    user: grfs_admin
+

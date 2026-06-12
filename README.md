@@ -1,141 +1,145 @@
-# GRFS Booking Django
+# GRFS Room Booking System
 
-A full-stack room booking system built with Django REST Framework backend and React frontend. This application allows users to book rooms across different floors, with role-based access control for users, mentors, coordinators, and admins.
+A production-ready, full-stack web application for managing room bookings at the Grand River Friendship Society (GRFS). This system provides a comprehensive solution for users to book rooms across multiple floors, with robust admin controls, automated email notifications, and conflict detection to prevent double-bookings.
 
-## Features
+## 🎯 What This Application Does
 
-- 🔐 **JWT Authentication** - Secure token-based authentication
-- 👥 **Role-Based Access Control** - User, Mentor, Coordinator, and Admin roles
-- 🏢 **Multi-Floor Room Management** - Organize rooms by floors
-- 📅 **Booking System** - Create and manage room bookings
-- 🔍 **Admin Dashboard** - Admin users can view all bookings
-- 🎨 **Modern React Frontend** - Responsive UI with React Router
+The GRFS Room Booking System is a complete booking management platform that enables:
 
-## Tech Stack
+- **User Registration & Approval Workflow**: New users register and await admin approval before gaining access
+- **Multi-Floor Room Management**: Organize and book rooms across different building floors
+- **Intelligent Booking System**: Create bookings for individual rooms or entire floors with automatic conflict detection
+- **Role-Based Access Control**: Four distinct user roles (User, Mentor, Coordinator, Admin) with appropriate permissions
+- **Admin Dashboard**: Comprehensive admin interface to view all bookings, approve/deny users, and manage booking statuses
+- **Automated Email Notifications**: Email alerts for account creation, approvals, booking confirmations, updates, cancellations, and reminders
+- **Booking Types**: Support for both regular bookings and camp bookings with different permission levels
+- **Real-Time Availability Checking**: Check room availability before creating bookings
+
+## 🚀 Technology Stack
 
 ### Backend
-- Django 5.2.8
-- Django REST Framework 3.16.1
-- PostgreSQL
-- JWT Authentication (djangorestframework-simplejwt)
-- python-dotenv for environment variable management
+- **Django 5.2.8** - High-level Python web framework
+- **Django REST Framework 3.16.1** - Powerful toolkit for building Web APIs
+- **PostgreSQL** - Production-grade relational database
+- **JWT Authentication** - Secure token-based authentication using `djangorestframework-simplejwt`
+- **Gunicorn** - Production WSGI HTTP server
+- **WhiteNoise** - Efficient static file serving for Django
+- **python-dotenv** - Environment variable management
+- **dj-database-url** - Database URL parsing for flexible deployment
 
 ### Frontend
-- React 19.2.0
-- React Router 7.9.5
-- Axios for API calls
+- **React 19.2.3** - Modern JavaScript library for building user interfaces
+- **React Router 7.9.5** - Declarative routing for React applications
+- **Vite 6.0.7** - Next-generation frontend build tool (faster than Create React App)
+- **Axios 1.7.9** - Promise-based HTTP client for API requests
+- **CSS3** - Custom styling with responsive design
 
-## Prerequisites
+### Infrastructure & Deployment
+- **Render** - Cloud platform for hosting (configured via `render.yaml`)
+- **PostgreSQL Database** - Managed database service on Render
+- **SMTP Email Service** - Configurable email backend for notifications
 
-- Python 3.8+
-- Node.js 14+
-- PostgreSQL 12+
-- pip (Python package manager)
-- npm or yarn
+## ✨ Key Features & Technical Highlights
 
-## Installation
+### Security & Authentication
+- **JWT Token-Based Authentication**: Secure access tokens with refresh token support
+- **Role-Based Access Control (RBAC)**: Granular permissions for different user types
+- **User Approval System**: Admin-controlled user registration workflow
+- **CORS Configuration**: Properly configured for production deployment
+- **Environment-Based Security**: Separate settings for development and production
+- **Password Validation**: Django's built-in password strength validators
 
-### Backend Setup
+### Database Design
+- **Optimized Database Schema**: Strategic use of indexes for performance
+  - Composite indexes on frequently queried fields (status, start_datetime, user)
+  - Foreign key relationships with proper cascading
+  - Many-to-many relationships for flexible room bookings
+- **Efficient Querying**: Use of `prefetch_related` and `select_related` to minimize database queries
+- **Database Migrations**: Version-controlled schema changes
 
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd GRFS-Booking-Django
-   ```
+### Business Logic
+- **Conflict Detection Algorithm**: Prevents double-bookings by checking overlapping time slots
+- **Multi-Room Booking Support**: Book multiple rooms or entire floors in a single transaction
+- **Booking Status Management**: Pending → Approved → Cancelled workflow
+- **Time Zone Handling**: Proper timezone support (America/New_York) with UTC conversion
+- **Booking Type System**: Different booking types (regular, camp) with role-based restrictions
 
-2. **Create and activate a virtual environment**
-   ```bash
-   # Windows
-   python -m venv venv
-   venv\Scripts\activate
+### Email System
+- **Automated Email Notifications**:
+  - Account creation confirmations
+  - User approval/rejection notifications
+  - Booking creation confirmations
+  - Booking status updates
+  - Booking cancellation notices
+  - Automated booking reminders (via management command)
+- **Graceful Degradation**: Falls back to console backend if email not configured
+- **Template-Based Emails**: Structured email content with user and booking details
 
-   # macOS/Linux
-   python3 -m venv venv
-   source venv/bin/activate
-   ```
+### Frontend Architecture
+- **Component-Based Design**: Reusable React components
+- **Protected Routes**: Private routes requiring authentication
+- **Admin Route Protection**: Role-based route access
+- **Responsive UI**: Modern, user-friendly interface
+- **State Management**: React hooks for efficient state handling
+- **API Service Layer**: Centralized API calls with Axios
 
-3. **Install Python dependencies**
-   ```bash
-   cd room_booking
-   pip install -r ../requirements.txt
-   ```
+### Production Features
+- **Static File Optimization**: WhiteNoise for efficient static file serving
+- **Build Process**: Automated build pipeline that compiles React app and integrates with Django
+- **Environment Configuration**: Comprehensive environment variable support
+- **Error Handling**: Robust error handling and logging throughout the application
+- **API Rate Limiting**: Throttling to prevent abuse (100/hour anonymous, 1000/hour authenticated)
 
-4. **Set up environment variables**
-   
-   Generate a SECRET_KEY and create a `.env` file:
-   ```bash
-   cd room_booking
-   python generate_secret_key.py
-   ```
-   
-   Copy `env.example` to `.env` and update with your values:
-   ```bash
-   # Windows PowerShell
-   Copy-Item env.example .env
-   
-   # macOS/Linux
-   cp env.example .env
-   ```
-   
-   Edit `.env` and replace:
-   - `SECRET_KEY` - Use the key from `generate_secret_key.py`
-   - `DB_PASSWORD` - Your PostgreSQL password
-   - Other values as needed
+## 📁 Project Structure
 
-5. **Set up PostgreSQL database**
-   
-   Create a PostgreSQL database:
-   ```sql
-   CREATE DATABASE room_booking;
-   CREATE USER room_admin WITH PASSWORD 'your-password';
-   GRANT ALL PRIVILEGES ON DATABASE room_booking TO room_admin;
-   ```
+```
+GRFS-Booking-Django/
+├── room_booking/                    # Django backend application
+│   ├── booking/                     # Main booking app
+│   │   ├── models.py               # Database models (User, Floor, Room, Booking)
+│   │   ├── views.py                # API views and business logic
+│   │   ├── serializers.py          # DRF serializers for API
+│   │   ├── urls.py                 # URL routing
+│   │   ├── email_utils.py          # Email notification system
+│   │   ├── admin.py                # Django admin configuration
+│   │   └── management/             # Custom management commands
+│   │       └── commands/
+│   │           └── send_booking_reminders.py
+│   ├── room_booking/               # Django project settings
+│   │   ├── settings.py             # Application settings
+│   │   ├── urls.py                 # Root URL configuration
+│   │   └── wsgi.py                 # WSGI configuration
+│   ├── requirements.txt            # Python dependencies
+│   └── manage.py                   # Django management script
+├── frontend/                        # React frontend application
+│   ├── src/
+│   │   ├── components/             # Reusable components
+│   │   │   ├── Navbar.jsx
+│   │   │   ├── PrivateRoute.jsx
+│   │   │   └── AdminRoute.jsx
+│   │   ├── pages/                  # Page components
+│   │   │   ├── auth/               # Authentication pages
+│   │   │   ├── booking/            # Booking pages
+│   │   │   └── dashboard/          # Dashboard pages
+│   │   ├── services/               # API service layer
+│   │   │   └── api.js
+│   │   └── styles/                 # CSS stylesheets
+│   ├── public/                     # Static assets
+│   ├── package.json                # Node.js dependencies
+│   └── vite.config.js              # Vite configuration
+├── render.yaml                      # Render deployment configuration
+└── README.md                        # This file
+```
 
-6. **Run migrations**
-   ```bash
-   python manage.py migrate
-   ```
+## 📡 API Endpoints
 
-7. **Create a superuser (optional)**
-   ```bash
-   python manage.py createsuperuser
-   ```
-
-8. **Run the development server**
-   ```bash
-   python manage.py runserver
-   ```
-
-   The backend API will be available at `http://localhost:8000`
-
-### Frontend Setup
-
-1. **Navigate to the frontend directory**
-   ```bash
-   cd frontend
-   ```
-
-2. **Install dependencies**
-   ```bash
-   npm install
-   ```
-
-3. **Start the development server**
-   ```bash
-   npm start
-   ```
-
-   The frontend will be available at `http://localhost:3000`
-
-## API Endpoints
-
-**Base URL:** `http://localhost:8000/api/`
+**API Base URL:** `/api/`
 
 ### Authentication
-- `POST /auth/register/` - Register a new user
-- `POST /auth/login/` - Login and get JWT tokens
-- `POST /auth/refresh/` - Refresh JWT token
-- `GET /auth/user/` - Get current user details
+- `POST /auth/register/` - Register a new user (requires admin approval)
+- `POST /auth/login/` - Login and receive JWT tokens
+- `POST /auth/refresh/` - Refresh access token
+- `GET /auth/user/` - Get current authenticated user details
 
 ### Floors & Rooms
 - `GET /floors/` - List all floors
@@ -143,123 +147,51 @@ A full-stack room booking system built with Django REST Framework backend and Re
 
 ### Bookings
 - `GET /bookings/` - List bookings (all for admin, own for users)
-- `POST /create_booking/` - Create booking with room/floor selection
+- `POST /create_booking/` - Create a new booking
+  - Body: `{room_ids: [], floor_id: null, start_datetime: "", end_datetime: "", booking_type: "regular"}`
 - `GET /bookings/my` - Get current user's bookings
-- `GET /check_availability/` - Check room availability for a date
+- `GET /bookings/<id>/` - Get booking details
+- `GET /check_availability/` - Check room availability for a date/time range
 
-## Quick Start
+### Admin Endpoints
+- `GET /admin/pending-users/` - List users pending approval
+- `POST /admin/approve-user/<user_id>/` - Approve or deny a user
+- `PATCH /admin/bookings/<booking_id>/status/` - Update booking status
+- `DELETE /admin/bookings/delete-all/` - Delete all bookings (admin only)
 
-After completing the installation steps above:
+## 🔒 Security Considerations
 
-1. **Start the backend server** (in `room_booking` directory):
-   ```bash
-   python manage.py runserver
-   ```
-   Backend runs at `http://localhost:8000`
+- **Never commit `.env` files** - Contains sensitive credentials
+- **Use strong SECRET_KEY** - Generate unique keys for each environment
+- **Set DEBUG=False in production** - Prevents information leakage
+- **Configure ALLOWED_HOSTS** - Restrict to your domain(s)
+- **Use HTTPS in production** - Encrypt data in transit
+- **Strong database passwords** - Especially important in production
+- **Regular dependency updates** - Keep packages up to date
 
-2. **Start the frontend** (in `frontend` directory, new terminal):
-   ```bash
-   npm start
-   ```
-   Frontend runs at `http://localhost:3000`
+## 🎓 What Makes This Project Stand Out
 
-3. **Test the application**:
-   - Open `http://localhost:3000` in your browser
-   - Register a new user
-   - Login and start booking rooms!
+This project demonstrates:
 
-## Project Structure
+1. **Full-Stack Development**: Complete application from database to frontend
+2. **Production-Ready Code**: Proper error handling, logging, and security practices
+3. **Modern Tech Stack**: Latest versions of Django, React, and build tools
+4. **RESTful API Design**: Well-structured API following REST principles
+5. **Database Optimization**: Strategic indexing and efficient querying
+6. **Email Automation**: Comprehensive notification system
+7. **Deployment Configuration**: Production deployment setup with Render
+8. **Code Organization**: Clean architecture with separation of concerns
+9. **User Experience**: Intuitive UI with role-based access
+10. **Business Logic**: Complex features like conflict detection and multi-room booking
 
-```
-GRFS-Booking-Django/
-├── room_booking/              # Django backend
-│   ├── booking/               # Main app
-│   │   ├── models.py         # Database models
-│   │   ├── views.py          # API views
-│   │   ├── serializers.py    # DRF serializers
-│   │   └── urls.py           # URL routing
-│   ├── room_booking/         # Project settings
-│   │   ├── settings.py       # Django settings
-│   │   └── urls.py           # Root URL config
-│   └── manage.py
-├── frontend/                  # React frontend
-│   ├── src/
-│   │   ├── components/       # Reusable components
-│   │   ├── pages/            # Page components
-│   │   ├── services/         # API service layer
-│   │   └── App.jsx           # Main app component
-│   └── package.json
-├── requirements.txt           # Python dependencies
-└── README.md
-```
-
-## User Roles
-
-- **User**: Can view floors/rooms and create bookings
-- **Mentor**: Same as User (can be extended)
-- **Coordinator**: Same as User (can be extended)
-- **Admin**: Can view all bookings and manage the system
-
-## Development
-
-### Running Tests
-```bash
-# Backend tests
-cd room_booking
-python manage.py test
-
-# Frontend tests
-cd frontend
-npm test
-```
-
-### Database Migrations
-```bash
-# Create migrations
-python manage.py makemigrations
-
-# Apply migrations
-python manage.py migrate
-```
-
-## Security Notes
-
-⚠️ **Important Security Considerations:**
-
-1. **Never commit `.env` files** - They contain sensitive information
-2. **Change default SECRET_KEY** - Generate a new one for production
-3. **Set DEBUG=False in production** - Prevents sensitive error information leakage
-4. **Use strong database passwords** - Especially in production environments
-5. **Configure ALLOWED_HOSTS** - Set to your domain in production
-6. **Use HTTPS in production** - Encrypt data in transit
-
-## Troubleshooting
-
-### Database Connection Issues
-- Ensure PostgreSQL is running
-- Verify database credentials in `.env` file
-- Check that the database and user exist
-
-### CORS Errors
-- Verify `CORS_ALLOWED_ORIGINS` in settings matches your frontend URL
-- Check that the frontend is running on the expected port
-
-### Migration Issues
-- Delete migration files (except `__init__.py`) and run `makemigrations` again
-- Ensure database is accessible and user has proper permissions
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## License
+## 📄 License
 
 This project is licensed under the MIT License.
 
-## Support
+## 👤 Author
 
-For issues and questions, please open an issue on the GitHub repository.
+Built as a productional website demonstrating full-stack development capabilities.
+
+---
+
+**Note**: This application was developed for the Grand River Friendship Society to manage their room booking needs efficiently and securely.

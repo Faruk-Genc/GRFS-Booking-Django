@@ -10,14 +10,106 @@ class UserSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'role', 'gender', 'password']
-        read_only_fields = ['role']  # Role cannot be set via API, only by admins
+        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'role', 'gender', 'password', 'approval_status']
+        read_only_fields = ['role', 'approval_status']  # Role and approval status cannot be set via regular API, only by admins
 
     def validate_email(self, value):
-        """Validate email format"""
+        """Validate email format and verify domain exists"""
         if not value:
             raise serializers.ValidationError("Email is required.")
-        return value.lower().strip()
+        
+        # Normalize email
+        email = value.strip().lower()
+        
+        # Basic length check
+        if len(email) > 100:
+            raise serializers.ValidationError("Email address is too long (maximum 100 characters).")
+        
+        if len(email) < 3:  # Minimum: a@b
+            raise serializers.ValidationError("Email address is too short.")
+        
+        # Comprehensive email validation regex (RFC 5322 compliant)
+        import re
+        email_pattern = r'^[a-zA-Z0-9.!#$%&\'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$'
+        
+        if not re.match(email_pattern, email):
+            raise serializers.ValidationError("Please enter a valid email address.")
+        
+        # Additional checks
+        if email.count('@') != 1:
+            raise serializers.ValidationError("Email must contain exactly one @ symbol.")
+        
+        local_part, domain = email.split('@')
+        
+        if len(local_part) == 0 or len(local_part) > 64:
+            raise serializers.ValidationError("Invalid email format.")
+        
+        if len(domain) == 0 or len(domain) > 255:
+            raise serializers.ValidationError("Invalid email format.")
+        
+        if '.' not in domain:
+            raise serializers.ValidationError("Email domain must contain at least one dot.")
+        
+        # Check for consecutive dots
+        if '..' in email:
+            raise serializers.ValidationError("Email cannot contain consecutive dots.")
+        
+        # Verify email domain exists by checking MX records
+        try:
+            import dns.resolver
+            import logging
+            logger = logging.getLogger(__name__)
+            
+            # Check for MX records (mail exchange records)
+            # This verifies the domain can receive emails
+            domain_valid = False
+            try:
+                mx_records = dns.resolver.resolve(domain, 'MX', lifetime=5)
+                if mx_records:
+                    domain_valid = True
+            except dns.resolver.NoAnswer:
+                # No MX records found, try checking if domain exists with A record as fallback
+                try:
+                    a_records = dns.resolver.resolve(domain, 'A', lifetime=5)
+                    if a_records:
+                        domain_valid = True
+                except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN):
+                    pass  # Domain doesn't exist
+            except dns.resolver.NXDOMAIN:
+                # Domain does not exist
+                pass
+            except dns.resolver.Timeout:
+                # DNS query timed out - retry once with longer timeout
+                try:
+                    mx_records = dns.resolver.resolve(domain, 'MX', lifetime=10)
+                    if mx_records:
+                        domain_valid = True
+                except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN, dns.resolver.Timeout):
+                    raise serializers.ValidationError("Unable to verify the email domain. Please check your email address and try again.")
+            except dns.exception.DNSException as e:
+                # Other DNS errors - log and reject
+                logger.warning(f"DNS error while validating email domain {domain}: {str(e)}")
+                raise serializers.ValidationError("Unable to verify the email domain. Please check your email address and try again.")
+            
+            if not domain_valid:
+                raise serializers.ValidationError("The email domain does not exist or cannot receive emails. Please enter a valid email address.")
+                
+        except ImportError:
+            # dnspython not available - skip domain validation
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning("dnspython not available - skipping email domain validation")
+        except serializers.ValidationError:
+            # Re-raise validation errors as-is
+            raise
+        except Exception as e:
+            # Unexpected errors - reject registration to be safe
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Unexpected error during email domain validation for {domain}: {str(e)}")
+            raise serializers.ValidationError("Unable to verify the email domain. Please check your email address and try again.")
+        
+        return email
 
     def validate_password(self, value):
         """Validate password strength"""
@@ -32,21 +124,90 @@ class UserSerializer(serializers.ModelSerializer):
         return value
 
     def create(self, validated_data):
-        # Force role to 'user' during registration - only admins can change roles
-        # Remove role from validated_data if present to prevent role escalation
-        validated_data.pop('role', None)
-        user = User(
-            username=validated_data['username'],
-            email=validated_data.get('email', ''),
-            first_name=validated_data.get('first_name', ''),
-            last_name=validated_data.get('last_name', ''),
-            gender=validated_data.get('gender', ''),
-            role='user'  # Always set to 'user' on registration for security
-        )
+        try:
+            # Force role to 'user' during registration - only admins can change roles
+            # Remove role from validated_data if present to prevent role escalation
+            validated_data.pop('role', None)
+            
+            # Get required fields with validation
+            email = validated_data.get('email', '').strip().lower()
+            if not email:
+                raise serializers.ValidationError({"email": "Email is required."})
+            
+            username = validated_data.get('username', '').strip()
+            if not username:
+                # If username not provided, use email prefix as username
+                username = email.split('@')[0]
+                # Ensure username is valid (max 150 chars, alphanumeric + @/./+/-/_)
+                username = ''.join(c for c in username if c.isalnum() or c in '@.+-_')[:150]
+                if not username:
+                    username = 'user'  # Fallback if email prefix is invalid
+            
+            # Ensure username is unique by appending numbers if needed
+            base_username = username
+            counter = 1
+            while User.objects.filter(username=username).exists():
+                username = f"{base_username}{counter}"
+                counter += 1
+                if counter > 1000:  # Safety limit
+                    raise serializers.ValidationError({"username": "Unable to generate unique username. Please provide a username."})
+            
+            password = validated_data.get('password')
+            if not password:
+                raise serializers.ValidationError({"password": "Password is required."})
+            
+            # Create user
+            try:
+                user = User(
+                    username=username,
+                    email=email,
+                    first_name=validated_data.get('first_name', '').strip(),
+                    last_name=validated_data.get('last_name', '').strip(),
+                    gender=validated_data.get('gender', ''),
+                    role='user',  # Always set to 'user' on registration for security
+                    approval_status='pending'  # New users require admin approval
+                )
 
-        user.set_password(validated_data['password'])
-        user.save()
-        return user
+                user.set_password(password)
+                user.save()
+            except Exception as db_error:
+                # Catch database errors during save
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Database error saving user: {str(db_error)}", exc_info=True)
+                # Re-raise as ValidationError with user-friendly message
+                error_str = str(db_error).lower()
+                if 'unique' in error_str or 'duplicate' in error_str:
+                    if 'email' in error_str:
+                        raise serializers.ValidationError({"email": "An account with this email already exists."})
+                    elif 'username' in error_str:
+                        raise serializers.ValidationError({"username": "An account with this username already exists."})
+                raise serializers.ValidationError({"detail": f"Failed to create account: {str(db_error)}"})
+            
+            # Send account creation email (don't fail registration if email fails)
+            # Wrap in try/except to catch any network/DNS errors
+            try:
+                from .email_utils import send_account_creation_email
+                send_account_creation_email(user)
+            except Exception as e:
+                # Log error but don't fail registration if email fails
+                # This includes network errors like "Name or service not known"
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Failed to send account creation email (non-blocking): {str(e)}", exc_info=True)
+                # Continue with registration even if email fails
+            
+            return user
+        except serializers.ValidationError:
+            # Re-raise validation errors as-is
+            raise
+        except Exception as e:
+            # Log unexpected errors
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error creating user: {str(e)}", exc_info=True)
+            # Re-raise as ValidationError so DRF handles it properly
+            raise serializers.ValidationError({"detail": f"Failed to create user: {str(e)}"})
         
 
 class FloorSerializer(serializers.ModelSerializer):
@@ -74,7 +235,7 @@ class BookingSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Booking
-        fields = ['id', 'user', 'rooms', 'room_ids', 'start_datetime', 'end_datetime', 'status', 'created_at']
+        fields = ['id', 'user', 'rooms', 'room_ids', 'start_datetime', 'end_datetime', 'status', 'booking_type', 'created_at']
         read_only_fields = ['status', 'user', 'created_at']  # Status and user cannot be set via API
 
     def __init__(self, *args, **kwargs):
@@ -114,8 +275,52 @@ class BookingSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         """Automatically assign the logged-in user when creating a booking"""
+        from datetime import timedelta
+        
         user = self.context['request'].user
         validated_data['user'] = user
-        # Ensure status is always 'Pending' for new bookings
-        validated_data['status'] = 'Pending'
-        return super().create(validated_data)
+        
+        # Get booking type (default to 'regular' if not provided)
+        booking_type = validated_data.get('booking_type', 'regular')
+        
+        # Auto-approve bookings made by admins
+        if user.role == 'admin':
+            validated_data['status'] = 'Approved'
+        # Camp bookings always require admin approval (unless made by admin)
+        elif booking_type == 'camp':
+            validated_data['status'] = 'Pending'
+        else:
+            # Determine booking status based on duration and number of rooms for regular bookings
+            # Auto-approve if: duration < 6 hours AND rooms <= 2
+            # Otherwise, require manual approval (Pending)
+            start_datetime = validated_data.get('start_datetime')
+            end_datetime = validated_data.get('end_datetime')
+            rooms = validated_data.get('rooms', [])  # room_ids maps to 'rooms' via source, returns Room objects
+            
+            if start_datetime and end_datetime:
+                booking_duration = end_datetime - start_datetime
+                duration_hours = booking_duration.total_seconds() / 3600
+                num_rooms = len(rooms) if rooms else 0
+                
+                if duration_hours < 8 and num_rooms <= 2:
+                    validated_data['status'] = 'Approved'
+                else:
+                    validated_data['status'] = 'Pending'
+            else:
+                validated_data['status'] = 'Pending'
+        
+        # Create the booking
+        booking = super().create(validated_data)
+        
+        # Send notification to admins if booking requires approval
+        if booking.status == 'Pending':
+            try:
+                from .email_utils import send_booking_approval_notification_to_admins
+                send_booking_approval_notification_to_admins(booking)
+            except Exception as e:
+                # Log error but don't fail booking creation if email fails
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Failed to send booking approval notification to admins: {str(e)}")
+        
+        return booking
