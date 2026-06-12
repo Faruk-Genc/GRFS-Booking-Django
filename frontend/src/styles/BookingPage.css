@@ -37,7 +37,9 @@ h2 {
 
 /* Floor Header (Click to Expand/Collapse) */
 .floor-header {
-  padding: 15px;
+  height: 54px;
+  padding: 8px 15px;
+  box-sizing: border-box;
   color: white;
   font-size: 18px;
   font-weight: bold;
@@ -141,14 +143,15 @@ h2 {
   align-items: center;
   gap: 15px;
   flex-shrink: 0;
+  height: 100%;
 }
 
 /* Book for Camp Button */
 .book-camp-btn {
-  max-height: 40px;
+  height: 38px;
   background-color: #d40000;
   color: #ffffff;
-  padding: 10px 20px;
+  padding: 0 20px;
   border: none;
   border-radius: 5px;
   cursor: pointer;
@@ -182,6 +185,22 @@ h2 {
   transform: rotate(180deg);
 }
 
+.camp-warning-list {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 18px;
+}
+
+.camp-warning {
+  padding: 10px 12px;
+  border-left: 4px solid #d40000;
+  border-radius: 5px;
+  background-color: #e8edf5;
+  color: #1a3970;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
 
 /* Checkbox Styling for Room Selection */
 input[type='checkbox'] {
@@ -205,8 +224,9 @@ input[type='checkbox'] {
 
 
   .floor-header {
+    height: 52px;
     font-size: 16px;
-    padding: 12px;
+    padding: 7px 12px;
     flex-direction: row;
     gap: 0px;
   }
@@ -220,9 +240,9 @@ input[type='checkbox'] {
   }
 
   .book-camp-btn {
+    height: 36px;
     font-size: 14px;
-    padding: 8px 15px;
-    max-height: none;
+    padding: 0 15px;
   }
 
   .dropdown-arrow svg {
@@ -275,8 +295,9 @@ input[type='checkbox'] {
 
 
   .floor-header {
+    height: 48px;
     font-size: 14px;
-    padding: 10px;
+    padding: 6px 10px;
   }
 
   .floor-header-right {
@@ -284,9 +305,9 @@ input[type='checkbox'] {
   }
 
   .book-camp-btn {
+    height: 34px;
     font-size: 12px;
-    padding: 6px 12px;
-    max-height: none;
+    padding: 0 10px;
   }
 
   .dropdown-arrow svg {

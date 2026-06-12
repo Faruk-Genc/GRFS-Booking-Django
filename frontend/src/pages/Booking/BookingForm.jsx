@@ -63,8 +63,10 @@ const BookingForm = () => {
 
   // Format hour
   const formatHour = (hour) => {
-    // Handle hour 24 (midnight/12am)
-    if (hour === 24 || hour === 0) {
+    if (hour === 24) {
+      return '11:59 PM';
+    }
+    if (hour === 0) {
       return '12:00 AM';
     }
     const period = hour >= 12 ? 'PM' : 'AM';
@@ -184,23 +186,21 @@ const BookingForm = () => {
     try {
       // Create datetime strings - backend will interpret in EST/EDT timezone
       // Format: YYYY-MM-DDTHH:MM:SS (no timezone, Django will use TIME_ZONE setting)
-      let startHour = parseInt(startTime);
+      const startHour = parseInt(startTime);
       let endHour = parseInt(endTime);
       
-      let startDate = selectedDate;
-      let endDate = isCampBooking ? selectedEndDate : selectedDate;
+      const startDate = selectedDate;
+      const endDate = isCampBooking ? selectedEndDate : selectedDate;
+      let endMinute = 0;
       
-      // Handle hour 24 (midnight) - convert to next day at 00:00
+      // Treat the midnight option as the final minute of the selected day.
       if (endHour === 24) {
-        endHour = 0;
-        // Add one day to the end date
-        const date = new Date(endDate);
-        date.setDate(date.getDate() + 1);
-        endDate = date.toISOString().split('T')[0];
+        endHour = 23;
+        endMinute = 59;
       }
       
       const startDatetime = `${startDate}T${String(startHour).padStart(2, '0')}:00:00`;
-      const endDatetime = `${endDate}T${String(endHour).padStart(2, '0')}:00:00`;
+      const endDatetime = `${endDate}T${String(endHour).padStart(2, '0')}:${String(endMinute).padStart(2, '0')}:00`;
 
       const response = await createBooking({
         room_ids: roomIds,
@@ -253,7 +253,7 @@ const BookingForm = () => {
     const options = [];
     
     // Find the earliest next booking after start time across all selected rooms
-    let maxEndHour = 24; // Default to midnight (24 = 12:00 AM next day)
+    let maxEndHour = 24; // Default to the final minute of the selected day.
     
     // Check unavailable slots to find the next booking that starts after our start time
     // We need to check all rooms in roomIds to find the earliest conflict
@@ -270,7 +270,7 @@ const BookingForm = () => {
     }
     
     // Generate options from startHour + 1 to maxEndHour (inclusive)
-    // Allow up to 24 (12:00 AM) as end time
+    // Value 24 represents 11:59 PM on the selected day.
     const actualMaxHour = Math.min(maxEndHour, 24);
     
     for (let hour = startHour + 1; hour <= actualMaxHour; hour++) {
@@ -450,7 +450,7 @@ const BookingForm = () => {
                   className="form-input"
                 >
                   <option value="">Select end time</option>
-                  {Array.from({ length: 24 }, (_, i) => i).map(hour => (
+                  {Array.from({ length: 24 }, (_, i) => i + 1).map(hour => (
                     <option key={hour} value={hour}>
                       {formatHour(hour)}
                     </option>

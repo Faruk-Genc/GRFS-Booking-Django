@@ -1,6 +1,31 @@
+from datetime import time, timedelta
+
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.contrib.auth import get_user_model
+from django.utils import timezone
+
+
+def normalize_booking_end_datetime(start_datetime, end_datetime):
+    """Represent an end-of-day midnight selection as 11:59 PM."""
+    if not start_datetime or not end_datetime:
+        return end_datetime
+
+    local_start = (
+        timezone.localtime(start_datetime)
+        if timezone.is_aware(start_datetime)
+        else start_datetime
+    )
+    local_end = (
+        timezone.localtime(end_datetime)
+        if timezone.is_aware(end_datetime)
+        else end_datetime
+    )
+
+    if local_end.time() == time.min and local_end.date() > local_start.date():
+        return end_datetime - timedelta(minutes=1)
+
+    return end_datetime
 
 class CustomUser(AbstractUser):
     
@@ -93,3 +118,10 @@ class Booking(models.Model):
 
     def __str__(self):
         return f"Booking by {self.user.username} from {self.start_datetime} to {self.end_datetime}"
+
+    def save(self, *args, **kwargs):
+        self.end_datetime = normalize_booking_end_datetime(
+            self.start_datetime,
+            self.end_datetime,
+        )
+        super().save(*args, **kwargs)

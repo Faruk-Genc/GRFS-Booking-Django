@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from rest_framework import status, permissions, generics
 from rest_framework import serializers
 from rest_framework.exceptions import AuthenticationFailed, ValidationError as DRFValidationError
-from .models import Booking, Room, Floor
+from .models import Booking, Room, Floor, normalize_booking_end_datetime
 from .serializers import *
 from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.views import TokenObtainPairView
@@ -219,6 +219,11 @@ class CreateBookingView(APIView):
                     )
             
             # Validate that end time is after start time
+            end_datetime = normalize_booking_end_datetime(
+                start_datetime,
+                end_datetime,
+            )
+
             if end_datetime <= start_datetime:
                 return Response(
                     {"detail": "End datetime must be after start datetime."}, 
@@ -533,6 +538,13 @@ class BookingDetailView(APIView):
                             data['end_datetime'] = est.localize(end_dt_naive, is_dst=False)
                 except ValueError:
                     pass  # Keep original value if parsing fails
+
+            effective_start = data.get('start_datetime', booking.start_datetime)
+            if 'end_datetime' in data and not isinstance(data.get('end_datetime'), str):
+                data['end_datetime'] = normalize_booking_end_datetime(
+                    effective_start,
+                    data.get('end_datetime'),
+                )
             
             # Check for conflicts (excluding current booking)
             if 'room_ids' in data and 'start_datetime' in data and 'end_datetime' in data:
@@ -1058,6 +1070,30 @@ class CheckAvailabilityView(APIView):
                 {"detail": "An error occurred while checking availability. Please try again later."}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+
+class UpcomingCampBookingsView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        now = timezone.now()
+        warning_cutoff = now + timedelta(days=5)
+        bookings = Booking.objects.select_related('user').filter(
+            booking_type='camp',
+            status='Approved',
+            start_datetime__lte=warning_cutoff,
+            end_datetime__gte=now,
+        ).order_by('start_datetime')
+
+        return Response([
+            {
+                'id': booking.id,
+                'gender': booking.user.get_gender_display() if booking.user.gender else 'General',
+                'start_datetime': booking.start_datetime,
+                'end_datetime': booking.end_datetime,
+            }
+            for booking in bookings
+        ], status=status.HTTP_200_OK)
 
 class PendingUsersView(APIView):
     """View to list all pending users - Admin only"""

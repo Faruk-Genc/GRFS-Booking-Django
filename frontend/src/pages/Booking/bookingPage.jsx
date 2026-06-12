@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getFloors, getRooms, getUser } from '../../services/api';
+import { getCampBookingWarnings, getFloors, getRooms, getUser } from '../../services/api';
 import '../../styles/BookingPage.css';
 
 const BookingPage = () => {
@@ -13,6 +13,7 @@ const BookingPage = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [user, setUser] = useState(null);
+  const [campWarnings, setCampWarnings] = useState([]);
 
   useEffect(() => {
     // Fetch user data to check role (optional - user may not be logged in)
@@ -26,6 +27,19 @@ const BookingPage = () => {
       }
     };
     fetchUserData();
+  }, []);
+
+  useEffect(() => {
+    const fetchCampWarnings = async () => {
+      try {
+        const response = await getCampBookingWarnings();
+        setCampWarnings(response.data);
+      } catch (err) {
+        console.error('Failed to fetch camp booking warnings:', err);
+      }
+    };
+
+    fetchCampWarnings();
   }, []);
 
   useEffect(() => {
@@ -143,6 +157,15 @@ const BookingPage = () => {
     return name.includes('downstairs') || name.includes('first') || name.includes('ground') || name === '1' || name === 'floor 1';
   };
 
+  const formatCampDateTime = (dateTime) => new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(new Date(dateTime));
+
   // Helper function to get static image path for a room
   // Images should be placed in frontend/public/rooms/ directory
   // Supported formats: jpg, jpeg, png, webp
@@ -189,6 +212,18 @@ const BookingPage = () => {
   return (
     <div className="container">
       <h2>Building Rooms</h2>
+
+      {campWarnings.length > 0 && (
+        <div className="camp-warning-list" aria-live="polite">
+          {campWarnings.map((camp) => (
+            <div className="camp-warning" key={camp.id}>
+              <strong>Camp booking notice:</strong>{' '}
+              {camp.gender} camp starts {formatCampDateTime(camp.start_datetime)} and ends{' '}
+              {formatCampDateTime(camp.end_datetime)}.
+            </div>
+          ))}
+        </div>
+      )}
 
       {error && (
         <div className="error-message">

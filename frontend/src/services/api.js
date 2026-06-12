@@ -109,6 +109,10 @@ export const checkAvailability = async (date, roomIds) => {
   return await API.get(`check_availability/?date=${date}&room_ids=${roomIdsStr}`);
 };
 
+export const getCampBookingWarnings = async () => {
+  return await API.get('camp-booking-warnings/');
+};
+
 export const createBooking = async (data) => {
   return await API.post('create_booking/', data);
 };

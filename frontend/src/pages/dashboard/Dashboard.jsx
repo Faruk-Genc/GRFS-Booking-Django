@@ -68,7 +68,10 @@ const Dashboard = () => {
   };
 
   const formatHour = (hour) => {
-    if (hour === 24 || hour === 0) {
+    if (hour === 24) {
+      return '11:59 PM';
+    }
+    if (hour === 0) {
       return '12:00 AM';
     }
     const period = hour >= 12 ? 'PM' : 'AM';
@@ -101,10 +104,12 @@ const Dashboard = () => {
     if (endDateObj) {
       const endDateTimeStr = booking.end_datetime;
       if (endDateTimeStr) {
-        const hourMatch = endDateTimeStr.match(/T(\d{2}):/);
-        if (hourMatch) {
-          endHour = parseInt(hourMatch[1]).toString();
-        }
+      const hourMatch = endDateTimeStr.match(/T(\d{2}):(\d{2})/);
+      if (hourMatch) {
+        endHour = hourMatch[2] === '59'
+          ? '24'
+          : parseInt(hourMatch[1]).toString();
+      }
       }
     }
     
@@ -171,19 +176,18 @@ const Dashboard = () => {
 
     try {
       // Format datetime strings like BookingForm does
-      let startHour = parseInt(editForm.startTime);
+      const startHour = parseInt(editForm.startTime);
       let endHour = parseInt(editForm.endTime);
       
-      let endDate = editForm.selectedDate;
+      const endDate = editForm.selectedDate;
+      let endMinute = 0;
       if (endHour === 24) {
-        endHour = 0;
-        const date = new Date(editForm.selectedDate);
-        date.setDate(date.getDate() + 1);
-        endDate = date.toISOString().split('T')[0];
+        endHour = 23;
+        endMinute = 59;
       }
       
       const startDatetime = `${editForm.selectedDate}T${String(startHour).padStart(2, '0')}:00:00`;
-      const endDatetime = `${endDate}T${String(endHour).padStart(2, '0')}:00:00`;
+      const endDatetime = `${endDate}T${String(endHour).padStart(2, '0')}:${String(endMinute).padStart(2, '0')}:00`;
 
       await updateBooking(bookingId, {
         start_datetime: startDatetime,

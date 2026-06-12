@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Booking, Room, Floor
+from .models import Booking, Room, Floor, normalize_booking_end_datetime
 from django.contrib.auth import get_user_model
 from django.db.models import Q
 
@@ -262,8 +262,18 @@ class BookingSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         """Validate booking datetime logic"""
-        start_datetime = data.get('start_datetime')
+        start_datetime = data.get(
+            'start_datetime',
+            self.instance.start_datetime if self.instance else None,
+        )
         end_datetime = data.get('end_datetime')
+
+        if end_datetime:
+            end_datetime = normalize_booking_end_datetime(
+                start_datetime,
+                end_datetime,
+            )
+            data['end_datetime'] = end_datetime
         
         if start_datetime and end_datetime:
             if end_datetime <= start_datetime:

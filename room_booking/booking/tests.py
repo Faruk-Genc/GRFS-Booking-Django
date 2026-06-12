@@ -1,8 +1,11 @@
+from datetime import timedelta
+
 from django.contrib.auth import get_user_model
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework.test import APITestCase
 
-from .models import Floor, Room
+from .models import Booking, Floor, Room
 
 
 class RoomListViewTests(APITestCase):
@@ -71,3 +74,68 @@ class RoomListViewTests(APITestCase):
             response.data["detail"],
             "Some rooms are invalid or unavailable for booking.",
         )
+
+    def test_booking_midnight_end_is_normalized_to_1159_pm(self):
+        self.client.force_authenticate(self.user)
+        booking_date = timezone.localdate() + timedelta(days=30)
+        next_date = booking_date + timedelta(days=1)
+
+        response = self.client.post(
+            reverse("create-booking"),
+            {
+                "room_ids": [self.active_room.id],
+                "start_datetime": f"{booking_date.isoformat()}T20:00:00",
+                "end_datetime": f"{next_date.isoformat()}T00:00:00",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201, response.data)
+        booking = Booking.objects.get(pk=response.data["id"])
+        local_end = timezone.localtime(booking.end_datetime)
+        self.assertEqual(local_end.date(), booking_date)
+        self.assertEqual(local_end.strftime("%H:%M"), "23:59")
+
+
+class CampBookingWarningTests(APITestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(
+            username="camp-mentor",
+            email="camp-mentor@example.com",
+            password="test-password",
+            role="mentor",
+            gender="male",
+        )
+        floor = Floor.objects.create(name="Downstairs")
+        self.room = Room.objects.create(floor=floor, name="Room 1")
+
+    def create_camp(self, starts_in_days, status="Approved"):
+        start = timezone.now() + timedelta(days=starts_in_days)
+        booking = Booking.objects.create(
+            user=self.user,
+            start_datetime=start,
+            end_datetime=start + timedelta(days=2),
+            status=status,
+            booking_type="camp",
+        )
+        booking.rooms.add(self.room)
+        return booking
+
+    def test_approved_camp_is_public_five_days_before_start(self):
+        camp = self.create_camp(4)
+
+        response = self.client.get(reverse("camp-booking-warnings"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]["id"], camp.id)
+        self.assertEqual(response.data[0]["gender"], "Male")
+
+    def test_future_and_pending_camps_are_not_shown(self):
+        self.create_camp(6)
+        self.create_camp(2, status="Pending")
+
+        response = self.client.get(reverse("camp-booking-warnings"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data, [])
