@@ -237,6 +237,59 @@ const Dashboard = () => {
     return new Date(booking.end_datetime) < new Date();
   };
 
+  const isCampBooking = (booking) => (
+    booking.booking_type?.toLowerCase() === 'camp'
+  );
+
+  const getBookingLocation = (booking) => (
+    isCampBooking(booking)
+      ? 'Downstairs'
+      : booking.rooms.map(room => room.name).join(', ')
+  );
+
+  const getCampLabel = (booking) => {
+    const gender = booking.user?.gender;
+    if (!gender) return 'Camp Booking';
+    return `${gender.charAt(0).toUpperCase()}${gender.slice(1)} Camp`;
+  };
+
+  const renderBookingDetails = (booking) => {
+    if (isCampBooking(booking)) {
+      return (
+        <div className="camp-booking-details">
+          <div className="camp-detail-block">
+            <strong>Starts</strong>
+            <span>{formatDate(booking.start_datetime)}</span>
+            <span>{formatTime(booking.start_datetime)}</span>
+          </div>
+          <div className="camp-detail-divider" aria-hidden="true" />
+          <div className="camp-detail-block">
+            <strong>Ends</strong>
+            <span>{formatDate(booking.end_datetime)}</span>
+            <span>{formatTime(booking.end_datetime)}</span>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="booking-details-compact">
+        <div className="detail-item-compact">
+          <strong>Date:</strong>
+          <span>{formatDate(booking.start_datetime)}</span>
+        </div>
+        <div className="detail-item-compact">
+          <strong>Start:</strong>
+          <span>{formatTime(booking.start_datetime)}</span>
+        </div>
+        <div className="detail-item-compact">
+          <strong>End:</strong>
+          <span>{formatTime(booking.end_datetime)}</span>
+        </div>
+      </div>
+    );
+  };
+
   // Filter out cancelled bookings and separate current from past
   const activeBookings = bookings.filter(b => b.status !== 'Cancelled');
   const currentBookings = activeBookings.filter(b => !isPastBooking(b));
@@ -259,7 +312,10 @@ const Dashboard = () => {
         ) : (
           <div className="bookings-list">
             {currentBookings.map((booking) => (
-              <div key={booking.id} className="booking-card">
+              <div
+                key={booking.id}
+                className={`booking-card ${isCampBooking(booking) ? 'camp-booking-card' : ''}`}
+              >
                 {editingBooking === booking.id ? (
                   <div className="edit-form">
                     <h3>Edit Booking</h3>
@@ -341,30 +397,28 @@ const Dashboard = () => {
                     <div className="booking-info">
                     <div className="booking-top-row">
                       <div className="left-side">
-                        <h3>{booking.rooms.map(r => r.name).join(', ')}</h3>
+                        <div className="booking-title-group">
+                          <h3>{getBookingLocation(booking)}</h3>
+                          {isCampBooking(booking) && (
+                            <span className="booking-type-badge">
+                              {getCampLabel(booking)}
+                            </span>
+                          )}
+                        </div>
                         <span className={`status-badge status-${booking.status.toLowerCase()}`}>
                           {booking.status}
                         </span>
                       </div>
                       <div className="right-side">
-                        <button onClick={() => handleEdit(booking)} className="btn-edit">Edit</button>
-                        <button onClick={() => handleDelete(booking.id)} className="btn-delete">Delete</button>
+                        {!isCampBooking(booking) && (
+                          <button onClick={() => handleEdit(booking)} className="btn-edit">Edit</button>
+                        )}
+                        <button onClick={() => handleDelete(booking.id)} className="btn-delete">
+                          {isCampBooking(booking) ? 'Cancel Camp' : 'Delete'}
+                        </button>
                       </div>
                     </div>
-                      <div className="booking-details-compact">
-                        <div className="detail-item-compact">
-                          <strong>Date:</strong>
-                          <span>{formatDate(booking.start_datetime)}</span>
-                        </div>
-                        <div className="detail-item-compact">
-                          <strong>Start:</strong>
-                          <span>{formatTime(booking.start_datetime)}</span>
-                        </div>
-                        <div className="detail-item-compact">
-                          <strong>End:</strong>
-                          <span>{formatTime(booking.end_datetime)}</span>
-                        </div>
-                      </div>
+                      {renderBookingDetails(booking)}
                     </div>
                     
                   </div>
@@ -388,29 +442,24 @@ const Dashboard = () => {
           {showPastBookings && (
             <div className="bookings-list">
               {pastBookings.map((booking) => (
-                <div key={booking.id} className="booking-card past-booking">
+                <div
+                  key={booking.id}
+                  className={`booking-card past-booking ${isCampBooking(booking) ? 'camp-booking-card' : ''}`}
+                >
                   <div className="booking-card-content">
                     <div className="booking-info">
                       <div className="booking-header-compact">
-                        <h3>{booking.rooms.map(r => r.name).join(', ')}</h3>
-                        <span className={`status-badge status-${booking.status.toLowerCase()}`}>
-                          {booking.status}
-                        </span>
+                        <div className="booking-title-group">
+                          <h3>{getBookingLocation(booking)}</h3>
+                          {isCampBooking(booking) && (
+                            <span className="booking-type-badge">
+                              {getCampLabel(booking)}
+                            </span>
+                          )}
+                        </div>
+                        <span className={`status-badge status-${booking.status.toLowerCase()}`}>{booking.status}</span>
                       </div>
-                      <div className="booking-details-compact">
-                        <div className="detail-item-compact">
-                          <strong>Date:</strong>
-                          <span>{formatDate(booking.start_datetime)}</span>
-                        </div>
-                        <div className="detail-item-compact">
-                          <strong>Start:</strong>
-                          <span>{formatTime(booking.start_datetime)}</span>
-                        </div>
-                        <div className="detail-item-compact">
-                          <strong>End:</strong>
-                          <span>{formatTime(booking.end_datetime)}</span>
-                        </div>
-                      </div>
+                      {renderBookingDetails(booking)}
                     </div>
                   </div>
                 </div>

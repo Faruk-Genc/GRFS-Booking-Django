@@ -218,7 +218,7 @@ const BookingPage = () => {
           {campWarnings.map((camp) => (
             <div className="camp-warning" key={camp.id}>
               <strong>Camp booking notice:</strong>{' '}
-              {camp.gender === 'Male' ? 'Boys' : 'Girls'} camp starts {formatCampDateTime(camp.start_datetime)} and ends{' '}
+              {camp.gender === 'Male' ? 'Boys' : 'Girls'} camp starts DOWNSTAIRS {formatCampDateTime(camp.start_datetime)} and ends{' '}
               {formatCampDateTime(camp.end_datetime)}.
             </div>
           ))}
