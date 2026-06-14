@@ -109,6 +109,16 @@ export const checkAvailability = async (date, roomIds) => {
   return await API.get(`check_availability/?date=${date}&room_ids=${roomIdsStr}`);
 };
 
+export const getAvailableRooms = async (date, startHour, endHour) => {
+  return await API.get('available_rooms/', {
+    params: {
+      date,
+      start_hour: startHour,
+      end_hour: endHour,
+    },
+  });
+};
+
 export const getCampBookingWarnings = async () => {
   return await API.get('camp-booking-warnings/');
 };

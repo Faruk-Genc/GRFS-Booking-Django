@@ -1,10 +1,17 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { getCampBookingWarnings, getFloors, getRooms, getUser } from '../../services/api';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import {
+  getAvailableRooms,
+  getCampBookingWarnings,
+  getFloors,
+  getRooms,
+  getUser,
+} from '../../services/api';
 import '../../styles/BookingPage.css';
 
 const BookingPage = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [floors, setFloors] = useState([]);
   const [fetchedRooms, setFetchedRooms] = useState({}); // Cache rooms for each floor
   const [activeFloors, setActiveFloors] = useState({}); // Track active floors
@@ -14,6 +21,18 @@ const BookingPage = () => {
   const [error, setError] = useState(null);
   const [user, setUser] = useState(null);
   const [campWarnings, setCampWarnings] = useState([]);
+  const [bookingMode, setBookingMode] = useState(
+    searchParams.get('mode') === 'time' ? 'time' : 'rooms',
+  );
+  const [timeDate, setTimeDate] = useState(searchParams.get('date') || '');
+  const [timeStart, setTimeStart] = useState(searchParams.get('start') || '');
+  const [timeEnd, setTimeEnd] = useState(searchParams.get('end') || '');
+  const [availableRooms, setAvailableRooms] = useState([]);
+  const [timeSelectedRooms, setTimeSelectedRooms] = useState([]);
+  const [timeSearchLoading, setTimeSearchLoading] = useState(false);
+  const [timeSearchComplete, setTimeSearchComplete] = useState(false);
+  const [timeSearchError, setTimeSearchError] = useState(null);
+  const today = new Date().toISOString().split('T')[0];
 
   useEffect(() => {
     // Fetch user data to check role (optional - user may not be logged in)
@@ -126,6 +145,104 @@ const BookingPage = () => {
     }
   };
 
+  const formatHour = (hour) => {
+    if (hour === 24) return '11:59 PM';
+    if (hour === 0) return '12:00 AM';
+    const period = hour >= 12 ? 'PM' : 'AM';
+    const displayHour = hour > 12 ? hour - 12 : hour;
+    return `${displayHour}:00 ${period}`;
+  };
+
+  const resetTimeResults = () => {
+    setAvailableRooms([]);
+    setTimeSelectedRooms([]);
+    setTimeSearchComplete(false);
+    setTimeSearchError(null);
+  };
+
+  const handleBookingModeChange = (mode) => {
+    setBookingMode(mode);
+    setError(null);
+  };
+
+  const handleTimeDateChange = (e) => {
+    setTimeDate(e.target.value);
+    resetTimeResults();
+  };
+
+  const handleTimeStartChange = (e) => {
+    const nextStart = e.target.value;
+    setTimeStart(nextStart);
+    if (timeEnd && parseInt(timeEnd) <= parseInt(nextStart)) {
+      setTimeEnd('');
+    }
+    resetTimeResults();
+  };
+
+  const handleTimeEndChange = (e) => {
+    setTimeEnd(e.target.value);
+    resetTimeResults();
+  };
+
+  const handleFindAvailableRooms = async (e) => {
+    e.preventDefault();
+    if (!timeDate || !timeStart || !timeEnd) return;
+
+    setTimeSearchLoading(true);
+    setTimeSearchError(null);
+    setTimeSearchComplete(false);
+    setTimeSelectedRooms([]);
+
+    try {
+      const response = await getAvailableRooms(timeDate, timeStart, timeEnd);
+      setAvailableRooms(response.data.available_rooms || []);
+      setTimeSearchComplete(true);
+    } catch (err) {
+      setAvailableRooms([]);
+      setTimeSearchError(
+        err.response?.data?.detail || 'Failed to find available rooms.',
+      );
+    } finally {
+      setTimeSearchLoading(false);
+    }
+  };
+
+  const handleTimeRoomSelection = (roomId) => {
+    setTimeSelectedRooms((current) => (
+      current.includes(roomId)
+        ? current.filter((id) => id !== roomId)
+        : [...current, roomId]
+    ));
+  };
+
+  const handleReviewTimeBooking = () => {
+    if (timeSelectedRooms.length === 0) return;
+
+    const params = new URLSearchParams({
+      rooms: timeSelectedRooms.join(','),
+      date: timeDate,
+      start: timeStart,
+      end: timeEnd,
+      source: 'time',
+    });
+    navigate(`/booking-form?${params.toString()}`);
+  };
+
+  const timeStartOptions = Array.from({ length: 16 }, (_, index) => index + 8);
+  const timeEndOptions = timeStart
+    ? Array.from(
+        { length: Math.min(24, parseInt(timeStart) + 8) - parseInt(timeStart) },
+        (_, index) => parseInt(timeStart) + index + 1,
+      )
+    : [];
+
+  const roomsByFloor = availableRooms.reduce((groups, room) => {
+    const floorName = room.floor?.name || 'Other';
+    if (!groups[floorName]) groups[floorName] = [];
+    groups[floorName].push(room);
+    return groups;
+  }, {});
+
   const handleCampBooking = async (floorId) => {
     // Check if user has permission to book camps
     if (!user || !['mentor', 'coordinator', 'admin'].includes(user.role)) {
@@ -233,77 +350,210 @@ const BookingPage = () => {
 
       {loading && <div className="loading-message">Loading floors...</div>}
 
-      <div className="accordion">
-        {floors.map((floor) => (
-          <div key={floor.id} className="floor">
-            <div
-              className="floor-header"
-              onClick={() => toggleFloor(floor.id)}
-            >
-              <div className="floor-header-text">
-                <h3>{floor.name}</h3>
-              </div>
-              <div className="floor-header-right">
-                {isDownstairsFloor(floor) && user && ['mentor', 'coordinator', 'admin'].includes(user.role) && (
-                  <button 
-                    className="book-camp-btn" 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleCampBooking(floor.id);
-                    }}
-                  >
-                    Book for Camp
-                  </button>
-                )}
-                <div className={`dropdown-arrow ${activeFloors[floor.id] ? 'open' : ''}`}>
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M6 9L12 15L18 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                </div>
-              </div>
-            </div>
-
-            {activeFloors[floor.id] && (
-              <div className="floor-content">
-                <ul>
-                  {fetchedRooms[floor.id] && fetchedRooms[floor.id].length > 0 ? (
-                    fetchedRooms[floor.id].map((room) => (
-                      <li key={room.id} className="room-item" onClick={() => handleRoomSelection(room.id)}>
-                        <div className="room-content">
-                          <img 
-                            src={getRoomImage(room)} 
-                            alt={room.name} 
-                            className="room-image"
-                            onError={(e) => handleImageError(e, room.id)}
-                            loading="lazy"
-                          />
-                          <span className="room-name">{room.name}</span>
-                        </div>
-                        <input
-                          type="checkbox"
-                          id={`room-${room.id}`}
-                          onChange={(e) => handleRoomSelection(room.id)} // This ensures it can also be toggled via the checkbox
-                          checked={selectedRooms.includes(room.id)}
-                        />
-                      </li>
-                    ))
-                  ) : (
-                    <li>No rooms available</li>
-                  )}
-                </ul>
-              </div>
-            )}
-          </div>
-        ))}
+      <div className="booking-mode-switch" aria-label="Choose how to start your booking">
+        <button
+          type="button"
+          className={bookingMode === 'rooms' ? 'active' : ''}
+          aria-pressed={bookingMode === 'rooms'}
+          onClick={() => handleBookingModeChange('rooms')}
+        >
+          Choose Rooms First
+        </button>
+        <button
+          type="button"
+          className={bookingMode === 'time' ? 'active' : ''}
+          aria-pressed={bookingMode === 'time'}
+          onClick={() => handleBookingModeChange('time')}
+        >
+          Choose Time First
+        </button>
       </div>
 
-      <button 
-        onClick={handleSubmit} 
-        className="booking-form-btn"
-        disabled={selectedRooms.length === 0 && selectedFloors.length === 0}
-      >
-        Go to Booking Form
-      </button>
+      {bookingMode === 'rooms' ? (
+        <>
+          <div className="accordion">
+            {floors.map((floor) => (
+              <div key={floor.id} className="floor">
+                <div
+                  className="floor-header"
+                  onClick={() => toggleFloor(floor.id)}
+                >
+                  <div className="floor-header-text">
+                    <h3>{floor.name}</h3>
+                  </div>
+                  <div className="floor-header-right">
+                    {isDownstairsFloor(floor) && user && ['mentor', 'coordinator', 'admin'].includes(user.role) && (
+                      <button
+                        className="book-camp-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleCampBooking(floor.id);
+                        }}
+                      >
+                        Book for Camp
+                      </button>
+                    )}
+                    <div className={`dropdown-arrow ${activeFloors[floor.id] ? 'open' : ''}`}>
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M6 9L12 15L18 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+
+                {activeFloors[floor.id] && (
+                  <div className="floor-content">
+                    <ul>
+                      {fetchedRooms[floor.id] && fetchedRooms[floor.id].length > 0 ? (
+                        fetchedRooms[floor.id].map((room) => (
+                          <li key={room.id} className="room-item" onClick={() => handleRoomSelection(room.id)}>
+                            <div className="room-content">
+                              <img
+                                src={getRoomImage(room)}
+                                alt={room.name}
+                                className="room-image"
+                                onError={(e) => handleImageError(e, room.id)}
+                                loading="lazy"
+                              />
+                              <span className="room-name">{room.name}</span>
+                            </div>
+                            <input
+                              type="checkbox"
+                              id={`room-${room.id}`}
+                              onChange={() => handleRoomSelection(room.id)}
+                              onClick={(e) => e.stopPropagation()}
+                              checked={selectedRooms.includes(room.id)}
+                            />
+                          </li>
+                        ))
+                      ) : (
+                        <li>No rooms available</li>
+                      )}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <button
+            onClick={handleSubmit}
+            className="booking-form-btn"
+            disabled={selectedRooms.length === 0 && selectedFloors.length === 0}
+          >
+            Go to Booking Form
+          </button>
+        </>
+      ) : (
+        <section className="time-first-booking">
+          <form className="time-search-form" onSubmit={handleFindAvailableRooms}>
+            <div className="time-search-field">
+              <label htmlFor="timeBookingDate">Date</label>
+              <input
+                id="timeBookingDate"
+                type="date"
+                min={today}
+                value={timeDate}
+                onChange={handleTimeDateChange}
+                required
+              />
+            </div>
+            <div className="time-search-field">
+              <label htmlFor="timeBookingStart">Start Time</label>
+              <select
+                id="timeBookingStart"
+                value={timeStart}
+                onChange={handleTimeStartChange}
+                required
+              >
+                <option value="">Select</option>
+                {timeStartOptions.map((hour) => (
+                  <option key={hour} value={hour}>{formatHour(hour)}</option>
+                ))}
+              </select>
+            </div>
+            <div className="time-search-field">
+              <label htmlFor="timeBookingEnd">End Time</label>
+              <select
+                id="timeBookingEnd"
+                value={timeEnd}
+                onChange={handleTimeEndChange}
+                disabled={!timeStart}
+                required
+              >
+                <option value="">Select</option>
+                {timeEndOptions.map((hour) => (
+                  <option key={hour} value={hour}>{formatHour(hour)}</option>
+                ))}
+              </select>
+            </div>
+            <button
+              type="submit"
+              className="find-rooms-btn"
+              disabled={timeSearchLoading || !timeDate || !timeStart || !timeEnd}
+            >
+              {timeSearchLoading ? 'Checking...' : 'Show Available Rooms'}
+            </button>
+          </form>
+
+          {timeSearchError && (
+            <div className="error-message">
+              <strong>Error:</strong> {timeSearchError}
+            </div>
+          )}
+
+          {timeSearchComplete && availableRooms.length === 0 && (
+            <div className="time-empty-state">
+              No rooms are available for the entire selected time.
+            </div>
+          )}
+
+          {availableRooms.length > 0 && (
+            <div className="available-room-results">
+              <div className="available-room-heading">
+                <h3>Available Rooms</h3>
+                <span>{timeSelectedRooms.length} selected</span>
+              </div>
+
+              {Object.entries(roomsByFloor).map(([floorName, rooms]) => (
+                <div className="available-floor-group" key={floorName}>
+                  <h4>{floorName}</h4>
+                  <div className="available-room-grid">
+                    {rooms.map((room) => (
+                      <label
+                        key={room.id}
+                        className={`available-room-option ${timeSelectedRooms.includes(room.id) ? 'selected' : ''}`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={timeSelectedRooms.includes(room.id)}
+                          onChange={() => handleTimeRoomSelection(room.id)}
+                        />
+                        <span>{room.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ))}
+
+              <div className="time-selection-actions">
+                <div>
+                  <strong>{timeDate}</strong>
+                  <span>{formatHour(parseInt(timeStart))} to {formatHour(parseInt(timeEnd))}</span>
+                </div>
+                <button
+                  type="button"
+                  className="booking-form-btn"
+                  disabled={timeSelectedRooms.length === 0}
+                  onClick={handleReviewTimeBooking}
+                >
+                  Review and Confirm
+                </button>
+              </div>
+            </div>
+          )}
+        </section>
+      )}
     </div>
   );
 };

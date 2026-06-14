@@ -1,8 +1,9 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from django.utils import timezone
+import pytz
 from rest_framework.test import APITestCase
 
 from .models import Booking, Floor, Room
@@ -139,3 +140,73 @@ class CampBookingWarningTests(APITestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data, [])
+
+
+class AvailableRoomsViewTests(APITestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(
+            username="availability-tester",
+            email="availability-tester@example.com",
+            password="test-password",
+        )
+        self.floor = Floor.objects.create(name="Upstairs")
+        self.booked_room = Room.objects.create(
+            floor=self.floor,
+            name="Room 1",
+        )
+        self.free_room = Room.objects.create(
+            floor=self.floor,
+            name="Room 2",
+        )
+        self.inactive_room = Room.objects.create(
+            floor=self.floor,
+            name="Room 3",
+            is_active=False,
+        )
+        self.booking_date = timezone.localdate() + timedelta(days=30)
+        est = pytz.timezone("America/New_York")
+        self.booking = Booking.objects.create(
+            user=self.user,
+            start_datetime=est.localize(
+                datetime.combine(self.booking_date, datetime.min.time().replace(hour=10)),
+            ),
+            end_datetime=est.localize(
+                datetime.combine(self.booking_date, datetime.min.time().replace(hour=12)),
+            ),
+            status="Approved",
+        )
+        self.booking.rooms.add(self.booked_room)
+
+    def find_rooms(self, start_hour, end_hour):
+        return self.client.get(
+            reverse("available-rooms"),
+            {
+                "date": self.booking_date.isoformat(),
+                "start_hour": start_hour,
+                "end_hour": end_hour,
+            },
+        )
+
+    def test_returns_only_rooms_free_for_entire_interval(self):
+        response = self.find_rooms(11, 13)
+
+        self.assertEqual(response.status_code, 200)
+        room_ids = {room["id"] for room in response.data["available_rooms"]}
+        self.assertEqual(room_ids, {self.free_room.id})
+
+    def test_booking_that_ends_at_start_time_does_not_conflict(self):
+        response = self.find_rooms(12, 13)
+
+        self.assertEqual(response.status_code, 200)
+        room_ids = {room["id"] for room in response.data["available_rooms"]}
+        self.assertEqual(room_ids, {self.booked_room.id, self.free_room.id})
+        self.assertNotIn(self.inactive_room.id, room_ids)
+
+    def test_rejects_booking_longer_than_eight_hours(self):
+        response = self.find_rooms(8, 17)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.data["detail"],
+            "Booking duration cannot exceed 8 hours.",
+        )

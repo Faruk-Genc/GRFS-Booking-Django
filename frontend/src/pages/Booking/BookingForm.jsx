@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { checkAvailability, createBooking, getUser } from '../../services/api';
+import { checkAvailability, createBooking, getRooms, getUser } from '../../services/api';
 import '../../styles/BookingPage.css';
 
 const BookingForm = () => {
@@ -16,14 +16,19 @@ const BookingForm = () => {
   // Get booking type from URL params
   const bookingType = searchParams.get('type') || 'regular';
   const isCampBooking = bookingType === 'camp';
+  const isTimeFirstBooking = searchParams.get('source') === 'time';
+  const initialDate = searchParams.get('date') || '';
+  const initialStartTime = searchParams.get('start') || '';
+  const initialEndTime = searchParams.get('end') || '';
   
   // State management
-  const [selectedDate, setSelectedDate] = useState('');
+  const [selectedDate, setSelectedDate] = useState(initialDate);
   const [selectedEndDate, setSelectedEndDate] = useState(''); // For camp bookings
   const [availableHours, setAvailableHours] = useState([]);
   const [unavailableSlots, setUnavailableSlots] = useState([]);
-  const [startTime, setStartTime] = useState('');
-  const [endTime, setEndTime] = useState('');
+  const [startTime, setStartTime] = useState(initialStartTime);
+  const [endTime, setEndTime] = useState(initialEndTime);
+  const [selectedRoomDetails, setSelectedRoomDetails] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [conflictDetails, setConflictDetails] = useState(null);
@@ -60,6 +65,27 @@ const BookingForm = () => {
       setUnavailableSlots([]);
     }
   }, [selectedDate, roomIds, fetchAvailability, isCampBooking]);
+
+  useEffect(() => {
+    const fetchSelectedRooms = async () => {
+      if (roomIds.length === 0) {
+        setSelectedRoomDetails([]);
+        return;
+      }
+
+      try {
+        const response = await getRooms();
+        setSelectedRoomDetails(
+          response.data.filter((room) => roomIds.includes(room.id)),
+        );
+      } catch (err) {
+        console.error('Failed to load selected room details:', err);
+        setSelectedRoomDetails([]);
+      }
+    };
+
+    fetchSelectedRooms();
+  }, [roomIds]);
 
   // Format hour
   const formatHour = (hour) => {
@@ -284,6 +310,14 @@ const BookingForm = () => {
   };
 
   const endTimeOptions = getEndTimeOptions();
+  const summaryDate = selectedDate
+    ? new Date(`${selectedDate}T12:00:00`).toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      })
+    : '';
 
   return (
     <div className="booking-form-container">
@@ -356,7 +390,10 @@ const BookingForm = () => {
           {/* Available Hours Display - only for regular bookings */}
           {!isCampBooking && !loading && selectedDate && availableHours.length > 0 && (
             <div className="availability-info">
-              <h3>Available Hours for {new Date(selectedDate).toLocaleDateString()}</h3>
+              <h3>
+                Available Hours for{' '}
+                {new Date(`${selectedDate}T12:00:00`).toLocaleDateString()}
+              </h3>
               <div className="available-hours">
                 {availableHours.map(hour => (
                   <span key={hour} className="hour-badge available">
@@ -473,6 +510,40 @@ const BookingForm = () => {
                 </select>
               )}
             </div>
+          )}
+
+          {selectedDate && startTime && endTime && (
+            <section className="booking-review-summary" aria-label="Booking summary">
+              <div className="booking-review-heading">
+                <h3>{isTimeFirstBooking ? 'Confirm Your Selection' : 'Booking Summary'}</h3>
+                {isTimeFirstBooking && <span>Time-first booking</span>}
+              </div>
+              <dl>
+                <div>
+                  <dt>Date</dt>
+                  <dd>
+                    {summaryDate}
+                    {isCampBooking && selectedEndDate && selectedEndDate !== selectedDate
+                      ? ` through ${new Date(`${selectedEndDate}T12:00:00`).toLocaleDateString('en-US')}`
+                      : ''}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Time</dt>
+                  <dd>{formatHour(parseInt(startTime))} to {formatHour(parseInt(endTime))}</dd>
+                </div>
+                <div>
+                  <dt>Rooms</dt>
+                  <dd>
+                    {isCampBooking
+                      ? 'Downstairs'
+                      : selectedRoomDetails.length > 0
+                        ? selectedRoomDetails.map((room) => room.name).join(', ')
+                        : 'Loading selected rooms...'}
+                  </dd>
+                </div>
+              </dl>
+            </section>
           )}
 
           {/* Error Display */}

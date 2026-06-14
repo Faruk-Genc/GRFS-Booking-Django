@@ -1072,6 +1072,91 @@ class CheckAvailabilityView(APIView):
             )
 
 
+class AvailableRoomsView(APIView):
+    """Return active rooms that are free for an entire requested interval."""
+
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        date_str = request.GET.get('date')
+        start_hour_str = request.GET.get('start_hour')
+        end_hour_str = request.GET.get('end_hour')
+
+        if not date_str or start_hour_str is None or end_hour_str is None:
+            return Response(
+                {"detail": "date, start_hour, and end_hour are required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            check_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+            start_hour = int(start_hour_str)
+            end_hour = int(end_hour_str)
+        except (TypeError, ValueError):
+            return Response(
+                {"detail": "Use YYYY-MM-DD for date and whole hours for start_hour and end_hour."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if start_hour < 8 or start_hour > 23 or end_hour < 9 or end_hour > 24:
+            return Response(
+                {"detail": "Hours must be between 8:00 AM and 11:59 PM."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if end_hour <= start_hour:
+            return Response(
+                {"detail": "End time must be after start time."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if end_hour - start_hour > 8:
+            return Response(
+                {"detail": "Booking duration cannot exceed 8 hours."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        est = pytz.timezone('America/New_York')
+        start_datetime = est.localize(
+            datetime.combine(check_date, datetime.min.time().replace(hour=start_hour)),
+        )
+        if end_hour == 24:
+            end_datetime = est.localize(
+                datetime.combine(check_date, datetime.max.time().replace(second=0, microsecond=0)),
+            )
+        else:
+            end_datetime = est.localize(
+                datetime.combine(check_date, datetime.min.time().replace(hour=end_hour)),
+            )
+
+        if start_datetime < timezone.now():
+            return Response(
+                {"detail": "Cannot search for booking times in the past."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        unavailable_room_ids = Booking.objects.filter(
+            status__in=['Pending', 'Approved'],
+            start_datetime__lt=end_datetime,
+            end_datetime__gt=start_datetime,
+            rooms__is_active=True,
+        ).values_list('rooms__id', flat=True)
+
+        available_rooms = Room.objects.filter(is_active=True).exclude(
+            id__in=unavailable_room_ids,
+        ).select_related('floor').order_by('floor__name', 'name')
+
+        return Response(
+            {
+                'date': date_str,
+                'start_hour': start_hour,
+                'end_hour': end_hour,
+                'available_rooms': RoomSerializer(available_rooms, many=True).data,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
 class UpcomingCampBookingsView(APIView):
     permission_classes = [permissions.AllowAny]
 
