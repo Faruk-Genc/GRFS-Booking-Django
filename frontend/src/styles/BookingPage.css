@@ -344,10 +344,11 @@ h2 {
 }
 
 .available-room-option {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto 56px minmax(0, 1fr);
   align-items: center;
   gap: 10px;
-  min-height: 48px;
+  min-height: 72px;
   box-sizing: border-box;
   padding: 10px 12px;
   border: 2px solid #dddddd;
@@ -367,6 +368,19 @@ h2 {
 .available-room-option input {
   flex: 0 0 auto;
   margin: 0;
+}
+
+.available-room-image {
+  width: 56px;
+  height: 48px;
+  border-radius: 5px;
+  object-fit: cover;
+  background-color: #dddddd;
+}
+
+.available-room-option span {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .time-selection-actions {

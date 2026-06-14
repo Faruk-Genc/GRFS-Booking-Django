@@ -9,6 +9,20 @@ import {
 } from '../../services/api';
 import '../../styles/BookingPage.css';
 
+const getLocalDateValue = (date = new Date()) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const getFloorPriority = (floorName = '') => {
+  const name = floorName.toLowerCase();
+  if (name.includes('upstairs') || name.includes('second') || name === 'floor 2') return 0;
+  if (name.includes('downstairs') || name.includes('first') || name.includes('ground')) return 1;
+  return 2;
+};
+
 const BookingPage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -32,7 +46,7 @@ const BookingPage = () => {
   const [timeSearchLoading, setTimeSearchLoading] = useState(false);
   const [timeSearchComplete, setTimeSearchComplete] = useState(false);
   const [timeSearchError, setTimeSearchError] = useState(null);
-  const today = new Date().toISOString().split('T')[0];
+  const today = getLocalDateValue();
 
   useEffect(() => {
     // Fetch user data to check role (optional - user may not be logged in)
@@ -242,6 +256,16 @@ const BookingPage = () => {
     groups[floorName].push(room);
     return groups;
   }, {});
+  const sortedFloors = [...floors].sort((a, b) => (
+    getFloorPriority(a.name) - getFloorPriority(b.name)
+      || a.name.localeCompare(b.name)
+  ));
+  const sortedRoomGroups = Object.entries(roomsByFloor).sort(
+    ([floorNameA], [floorNameB]) => (
+      getFloorPriority(floorNameA) - getFloorPriority(floorNameB)
+        || floorNameA.localeCompare(floorNameB)
+    ),
+  );
 
   const handleCampBooking = async (floorId) => {
     // Check if user has permission to book camps
@@ -372,7 +396,7 @@ const BookingPage = () => {
       {bookingMode === 'rooms' ? (
         <>
           <div className="accordion">
-            {floors.map((floor) => (
+            {sortedFloors.map((floor) => (
               <div key={floor.id} className="floor">
                 <div
                   className="floor-header"
@@ -515,7 +539,7 @@ const BookingPage = () => {
                 <span>{timeSelectedRooms.length} selected</span>
               </div>
 
-              {Object.entries(roomsByFloor).map(([floorName, rooms]) => (
+              {sortedRoomGroups.map(([floorName, rooms]) => (
                 <div className="available-floor-group" key={floorName}>
                   <h4>{floorName}</h4>
                   <div className="available-room-grid">
@@ -528,6 +552,13 @@ const BookingPage = () => {
                           type="checkbox"
                           checked={timeSelectedRooms.includes(room.id)}
                           onChange={() => handleTimeRoomSelection(room.id)}
+                        />
+                        <img
+                          src={getRoomImage(room)}
+                          alt=""
+                          className="available-room-image"
+                          onError={(e) => handleImageError(e, room.id)}
+                          loading="lazy"
                         />
                         <span>{room.name}</span>
                       </label>

@@ -3,6 +3,13 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { checkAvailability, createBooking, getRooms, getUser } from '../../services/api';
 import '../../styles/BookingPage.css';
 
+const getLocalDateValue = (date = new Date()) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 const BookingForm = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -35,7 +42,7 @@ const BookingForm = () => {
   const [submitting, setSubmitting] = useState(false);
 
   // Get today's date in YYYY-MM-DD format for min date
-  const today = new Date().toISOString().split('T')[0];
+  const today = getLocalDateValue();
 
   // Memoize fetchAvailability to prevent recreating on every render
   const fetchAvailability = useCallback(async () => {
@@ -123,27 +130,6 @@ const BookingForm = () => {
   const handleEndDateChange = (e) => {
     setSelectedEndDate(e.target.value);
     setConflictDetails(null);
-  };
-
-  const handleDateInputClick = (e) => {
-    // Focus the input to open the calendar
-    e.target.focus();
-    // Try to show the native picker if available (only works on non-readonly inputs)
-    if (e.target.showPicker && !e.target.readOnly) {
-      try {
-        e.target.showPicker();
-      } catch (err) {
-        // If showPicker fails, focus is enough to open calendar in most browsers
-        console.log('showPicker not available, using focus');
-      }
-    }
-  };
-
-  const handleDateKeyDown = (e) => {
-    // Prevent typing - only allow navigation keys
-    if (!['Tab', 'Enter', 'Escape', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
-      e.preventDefault();
-    }
   };
 
   const handleStartTimeChange = (e) => {
@@ -354,12 +340,9 @@ const BookingForm = () => {
               id="date"
               value={selectedDate}
               onChange={handleDateChange}
-              onKeyDown={handleDateKeyDown}
-              onKeyPress={(e) => e.preventDefault()}
               min={today}
               required
               className="form-input date-input"
-              onClick={handleDateInputClick}
             />
           </div>
 
@@ -372,12 +355,9 @@ const BookingForm = () => {
                 id="endDate"
                 value={selectedEndDate}
                 onChange={handleEndDateChange}
-                onKeyDown={handleDateKeyDown}
-                onKeyPress={(e) => e.preventDefault()}
                 min={selectedDate || today}
                 required
                 className="form-input date-input"
-                onClick={handleDateInputClick}
               />
             </div>
           )}
