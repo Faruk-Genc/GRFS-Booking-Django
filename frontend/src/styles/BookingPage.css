@@ -117,13 +117,6 @@ h2 {
   align-items: center;
 }
 
-.room-image {
-  width: 50px;
-  height: 50px;
-  border-radius: 50%;
-  margin-right: 15px;
-}
-
 .room-name {
   font-size: 16px;
   flex-grow: 1;
@@ -345,10 +338,10 @@ h2 {
 
 .available-room-option {
   display: grid;
-  grid-template-columns: auto 56px minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: 10px;
-  min-height: 72px;
+  min-height: 48px;
   box-sizing: border-box;
   padding: 10px 12px;
   border: 2px solid #dddddd;
@@ -368,14 +361,6 @@ h2 {
 .available-room-option input {
   flex: 0 0 auto;
   margin: 0;
-}
-
-.available-room-image {
-  width: 56px;
-  height: 48px;
-  border-radius: 5px;
-  object-fit: cover;
-  background-color: #dddddd;
 }
 
 .available-room-option span {
@@ -523,12 +508,6 @@ input[type='checkbox'] {
     padding: 8px 12px;
   }
 
-  .room-image {
-    width: 40px;
-    height: 40px;
-    margin-right: 10px;
-  }
-
   button {
     font-size: 14px;
     padding: 8px 15px;
@@ -603,12 +582,6 @@ input[type='checkbox'] {
   .room-item {
     font-size: 13px;
     padding: 6px 10px;
-  }
-
-  .room-image {
-    width: 35px;
-    height: 35px;
-    margin-right: 8px;
   }
 
   .booking-form-btn {

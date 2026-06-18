@@ -307,49 +307,6 @@ const BookingPage = () => {
     minute: '2-digit',
   }).format(new Date(dateTime));
 
-  // Helper function to get static image path for a room
-  // Images should be placed in frontend/public/rooms/ directory
-  // Supported formats: jpg, jpeg, png, webp
-  // In production, images are served from /static/rooms/ via Django/WhiteNoise
-  const getRoomImage = (room) => {
-    const roomId = room.id;
-    // Use /static/rooms/ for production (Django serves static files from /static/)
-    // In development, Vite serves from /rooms/ directly
-    const basePath = import.meta.env.DEV ? '/rooms' : '/static/rooms';
-    return `${basePath}/room-${roomId}.jpeg`;
-  };
-
-  // Helper function to handle image loading errors and try alternative extensions
-  const handleImageError = (e, roomId) => {
-    const target = e.target;
-    const currentSrc = target.src;
-    
-    // Extract the base path and try different extensions
-    const extensions = ['jpeg', 'jpg', 'png', 'webp'];
-    const basePath = import.meta.env.DEV ? '/rooms' : '/static/rooms';
-    
-    // Find which extension we're currently trying
-    let currentExt = 'jpeg';
-    for (const ext of extensions) {
-      if (currentSrc.includes(`.${ext}`)) {
-        currentExt = ext;
-        break;
-      }
-    }
-    
-    // Try next extension
-    const currentIndex = extensions.indexOf(currentExt);
-    if (currentIndex < extensions.length - 1) {
-      const nextExt = extensions[currentIndex + 1];
-      target.src = `${basePath}/room-${roomId}.${nextExt}`;
-    } else {
-      // All extensions tried, use placeholder
-      const placeholderPath = import.meta.env.DEV ? '/rooms' : '/static/rooms';
-      target.src = `${placeholderPath}/placeholder.jpg`;
-      target.onerror = null; // Prevent infinite loop
-    }
-  };
-
   return (
     <div className="container">
       <h2>Building Rooms</h2>
@@ -432,13 +389,6 @@ const BookingPage = () => {
                         fetchedRooms[floor.id].map((room) => (
                           <li key={room.id} className="room-item" onClick={() => handleRoomSelection(room.id)}>
                             <div className="room-content">
-                              <img
-                                src={getRoomImage(room)}
-                                alt={room.name}
-                                className="room-image"
-                                onError={(e) => handleImageError(e, room.id)}
-                                loading="lazy"
-                              />
                               <span className="room-name">{room.name}</span>
                             </div>
                             <input
@@ -552,13 +502,6 @@ const BookingPage = () => {
                           type="checkbox"
                           checked={timeSelectedRooms.includes(room.id)}
                           onChange={() => handleTimeRoomSelection(room.id)}
-                        />
-                        <img
-                          src={getRoomImage(room)}
-                          alt=""
-                          className="available-room-image"
-                          onError={(e) => handleImageError(e, room.id)}
-                          loading="lazy"
                         />
                         <span>{room.name}</span>
                       </label>
