@@ -33,7 +33,7 @@ if not SECRET_KEY:
     raise ValueError("SECRET_KEY environment variable must be set")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv('DEBUG', 'True').lower() == 'true'
+DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
 
 # ALLOWED_HOSTS configuration
 # In production, this must be set to your domain(s)
@@ -67,12 +67,14 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'booking',
     'rest_framework',
+    'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
 ]
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
+    'booking.middleware.SecurityHeadersMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',  # Add whitenoise for static files
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -138,7 +140,7 @@ if DATABASE_URL:
             db_config['OPTIONS'] = {}
         
         # Add connection timeout for production
-        if not DEBUG:
+        if not DEBUG and db_config.get('ENGINE', '').endswith('postgresql'):
             # Set a reasonable connection timeout (10 seconds)
             db_config['OPTIONS']['connect_timeout'] = 10
         
@@ -238,10 +240,10 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'booking.authentication.CookieJWTAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': (
-        'rest_framework.permissions.IsAuthenticated',
+        'booking.permissions.IsApprovedUser',
     ),
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
@@ -254,6 +256,18 @@ REST_FRAMEWORK = {
         'user': '1000/hour'
     }
 }
+
+SIMPLE_JWT = {
+    # Reject access/refresh tokens issued before the user's latest password change.
+    'CHECK_REVOKE_TOKEN': True,
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
+}
+
+SECURE_REFERRER_POLICY = 'same-origin'
+
+# A restrictive baseline for the React application. Vite emits external assets.
+CONTENT_SECURITY_POLICY = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
 
 # CORS Settings
 CORS_ALLOWED_ORIGINS = os.getenv(

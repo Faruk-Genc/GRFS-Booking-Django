@@ -8,13 +8,6 @@ const PrivateRoute = ({ children }) => {
 
   useEffect(() => {
     const validateToken = async () => {
-      const token = localStorage.getItem('access');
-      if (!token) {
-        setIsAuthenticated(false);
-        setLoading(false);
-        return;
-      }
-
       try {
         // Validate token by making an authenticated request
         const response = await getUser();
@@ -26,8 +19,6 @@ const PrivateRoute = ({ children }) => {
         }
       } catch (error) {
         // Token is invalid or expired
-        localStorage.removeItem('access');
-        localStorage.removeItem('refresh');
         setIsAuthenticated(false);
       } finally {
         setLoading(false);

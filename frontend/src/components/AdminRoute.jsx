@@ -10,12 +10,6 @@ const AdminRoute = ({ children }) => {
   useEffect(() => {
     const checkAdmin = async () => {
       try {
-        const token = localStorage.getItem('access');
-        if (!token) {
-          navigate('/login');
-          return;
-        }
-
         const response = await getUser();
         if (response.data.role === 'admin') {
           setIsAdmin(true);

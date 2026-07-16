@@ -20,15 +20,12 @@ const API = axios.create({
     'Content-Type': 'application/json',
   },
   timeout: 10000, // 10 second timeout
+  withCredentials: true,
+  xsrfCookieName: 'csrftoken',
+  xsrfHeaderName: 'X-CSRFToken',
 });
 
-// Automatically attach JWT token to every request if it exists
 API.interceptors.request.use((config) => {
-  const token = localStorage.getItem('access');
-  if (token && !config.url.includes('auth/register') && !config.url.includes('auth/login')) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  
   // Ensure baseURL is properly set
   if (!config.url.startsWith('http') && !config.baseURL) {
     console.warn('⚠️ API request missing baseURL:', config.url);
@@ -68,20 +65,10 @@ API.interceptors.response.use(
       originalRequest._retry = true;
       
       try {
-        const refreshToken = localStorage.getItem('refresh');
-        if (refreshToken) {
-          const response = await axios.post(`${API_BASE_URL}auth/refresh/`, {
-            refresh: refreshToken
-          });
-          const { access } = response.data;
-          localStorage.setItem('access', access);
-          originalRequest.headers.Authorization = `Bearer ${access}`;
-          return API(originalRequest);
-        }
+        await axios.post(`${API_BASE_URL}auth/refresh/`, {}, { withCredentials: true });
+        return API(originalRequest);
       } catch (refreshError) {
         // Refresh failed, redirect to login
-        localStorage.removeItem('access');
-        localStorage.removeItem('refresh');
         window.location.href = '/login';
         return Promise.reject(refreshError);
       }
@@ -99,6 +86,8 @@ export const registerUser = async (data) => {
 export const loginUser = async (data) => {
   return await API.post('auth/login/', data);
 };
+
+export const logoutUser = async () => API.post('auth/logout/');
 
 export const getUser = async () => {
   return await API.get('auth/user/');

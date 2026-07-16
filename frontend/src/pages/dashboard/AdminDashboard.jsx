@@ -177,6 +177,9 @@ const AdminDashboard = () => {
   };
 
   const getBookingGenderClass = (booking) => {
+    if (booking?.status?.toString().toLowerCase() !== 'approved') {
+      return '';
+    }
     const bookingType = booking?.booking_type;
     if (!bookingType || bookingType.toString().toLowerCase() !== 'camp') {
       return '';
@@ -843,6 +846,14 @@ const AdminDashboard = () => {
         <div className="legend-item">
           <span className="legend-color booking-approved"></span>
           <span>Approved</span>
+        </div>
+        <div className="legend-item">
+          <span className="legend-color booking-camp-male"></span>
+          <span>Approved Boys Camp</span>
+        </div>
+        <div className="legend-item">
+          <span className="legend-color booking-camp-female"></span>
+          <span>Approved Girls Camp</span>
         </div>
       </div>
 

@@ -28,9 +28,7 @@ const handleSubmit = async (e) => {
   };
 
   try {
-    const res = await loginUser(dataToSend);
-    localStorage.setItem('access', res.data.access);
-    localStorage.setItem('refresh', res.data.refresh);
+    await loginUser(dataToSend);
     
     // Redirect to the page the user came from, or home if no redirect specified
     const from = location.state?.from || '/';

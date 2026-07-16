@@ -501,6 +501,7 @@
   background: white;
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  flex-wrap: wrap;
 }
 
 .legend-item {
@@ -522,6 +523,14 @@
 
 .legend-color.booking-approved {
   background: #4caf50;
+}
+
+.legend-color.booking-camp-male {
+  background: #2196f3;
+}
+
+.legend-color.booking-camp-female {
+  background: #e91e63;
 }
 
 .legend-color.booking-cancelled {
@@ -1076,4 +1085,3 @@
     padding: 12px;
   }
 }
-

@@ -15,6 +15,7 @@ class RoomListViewTests(APITestCase):
             username="room-tester",
             email="room-tester@example.com",
             password="test-password",
+            approval_status="approved",
         )
         floor = Floor.objects.create(name="Main Building Floor 2")
         self.active_room = Room.objects.create(
@@ -106,6 +107,7 @@ class CampBookingWarningTests(APITestCase):
             password="test-password",
             role="mentor",
             gender="male",
+            approval_status="approved",
         )
         floor = Floor.objects.create(name="Downstairs")
         self.room = Room.objects.create(floor=floor, name="Room 1")
@@ -148,6 +150,7 @@ class AvailableRoomsViewTests(APITestCase):
             username="availability-tester",
             email="availability-tester@example.com",
             password="test-password",
+            approval_status="approved",
         )
         self.floor = Floor.objects.create(name="Upstairs")
         self.booked_room = Room.objects.create(
@@ -210,3 +213,72 @@ class AvailableRoomsViewTests(APITestCase):
             response.data["detail"],
             "Booking duration cannot exceed 8 hours.",
         )
+
+
+class BookingSecurityTests(APITestCase):
+    def setUp(self):
+        User = get_user_model()
+        self.user = User.objects.create_user(
+            username='approved-user', email='approved@example.com',
+            password='A-secure-test-password-938!', approval_status='approved',
+        )
+        self.other_user = User.objects.create_user(
+            username='other-user', email='other@example.com',
+            password='A-secure-test-password-938!', approval_status='approved',
+        )
+        floor = Floor.objects.create(name='Security Test Floor')
+        self.room = Room.objects.create(floor=floor, name='Security Test Room')
+        self.other_room = Room.objects.create(floor=floor, name='Other Room')
+        self.client.force_authenticate(self.user)
+
+    def test_alternate_booking_creation_endpoint_is_closed(self):
+        start = timezone.now() + timedelta(days=3)
+        response = self.client.post(reverse('booking-list-create'), {
+            'room_ids': [self.room.id],
+            'start_datetime': start.isoformat(),
+            'end_datetime': (start + timedelta(hours=2)).isoformat(),
+        }, format='json')
+        self.assertEqual(response.status_code, 405)
+        self.assertEqual(Booking.objects.count(), 0)
+
+    def test_partial_time_update_cannot_bypass_conflict_check(self):
+        start = timezone.now() + timedelta(days=3)
+        existing = Booking.objects.create(
+            user=self.other_user, start_datetime=start,
+            end_datetime=start + timedelta(hours=2), status='Approved',
+        )
+        existing.rooms.add(self.room)
+        editable = Booking.objects.create(
+            user=self.user, start_datetime=start + timedelta(hours=4),
+            end_datetime=start + timedelta(hours=6), status='Approved',
+        )
+        editable.rooms.add(self.room)
+
+        response = self.client.put(
+            reverse('booking-detail', args=[editable.id]),
+            {'start_datetime': (start + timedelta(hours=1)).isoformat()},
+            format='json',
+        )
+        self.assertEqual(response.status_code, 409)
+
+    def test_material_user_edit_returns_approved_booking_to_pending(self):
+        start = timezone.now() + timedelta(days=4)
+        booking = Booking.objects.create(
+            user=self.user, start_datetime=start,
+            end_datetime=start + timedelta(hours=2), status='Approved',
+        )
+        booking.rooms.add(self.room)
+
+        response = self.client.put(
+            reverse('booking-detail', args=[booking.id]),
+            {'room_ids': [self.other_room.id]}, format='json',
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        booking.refresh_from_db()
+        self.assertEqual(booking.status, 'Pending')
+
+    def test_unapproved_existing_session_is_rejected(self):
+        self.user.approval_status = 'denied'
+        self.user.save(update_fields=['approval_status'])
+        response = self.client.get(reverse('my-bookings'))
+        self.assertEqual(response.status_code, 403)

@@ -9,18 +9,21 @@ from .serializers import *
 from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from datetime import datetime, timedelta
 from django.db.models import Q
-from django.db import IntegrityError, DatabaseError
+from django.db import IntegrityError, DatabaseError, connection, transaction
+from django.contrib.auth.password_validation import validate_password
 from django.http import HttpResponse
-from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_http_methods
 from django.conf import settings
 import pytz
 import logging
 import os
+from .permissions import IsApprovedUser
 
 # Create your views here.
 
@@ -29,7 +32,7 @@ logger = logging.getLogger(__name__)
 User = get_user_model()
 
 # View to serve React app in production
-@csrf_exempt  # Exempt from CSRF since this is just serving static HTML
+@ensure_csrf_cookie
 def serve_react_app(request):
     """Serve the React app's index.html for all non-API routes"""
     # Only handle GET and HEAD requests
@@ -112,8 +115,17 @@ def check_booking_conflicts(room_ids, start_datetime, end_datetime, exclude_book
     
     return conflicts
 
+
+def lock_booking_rooms(room_ids):
+    """Serialize booking changes per room for the lifetime of the transaction."""
+    if connection.vendor != 'postgresql':
+        return
+    with connection.cursor() as cursor:
+        for room_id in sorted({int(room_id) for room_id in room_ids}):
+            cursor.execute('SELECT pg_advisory_xact_lock(%s)', [room_id])
+
 class CreateBookingView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsApprovedUser]
     
     def post(self, request):
         try:
@@ -259,6 +271,7 @@ class CreateBookingView(APIView):
             # Check for booking conflicts - use database transaction to prevent race conditions
             from django.db import transaction
             with transaction.atomic():
+                lock_booking_rooms(room_ids)
                 # Check for conflicts (works for both regular and camp bookings)
                 conflicts = check_booking_conflicts(room_ids, start_datetime, end_datetime)
                 if conflicts:
@@ -386,7 +399,7 @@ class RoomListView(APIView):
             )
     
 class BookingListCreateView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsApprovedUser]
     
     def get(self, request):
         try:
@@ -410,28 +423,13 @@ class BookingListCreateView(APIView):
             )
     
     def post(self, request):
-        try:
-            serializer = BookingSerializer(data=request.data, context={'request': request})
-            if serializer.is_valid():
-                serializer.save()
-                return Response(serializer.data, status=status.HTTP_201_CREATED)
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        except (ValueError, TypeError, AttributeError) as e:
-            return Response(
-                {"detail": f"Invalid input: {str(e)}"}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        except Exception as e:
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.error(f"Error creating booking: {str(e)}", exc_info=True)
-            return Response(
-                {"detail": "An error occurred while creating booking. Please try again later."}, 
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+        return Response(
+            {"detail": "Use /api/create_booking/ to create a booking."},
+            status=status.HTTP_405_METHOD_NOT_ALLOWED,
+        )
 
 class MyBookingView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsApprovedUser]
     
     def get(self, request):
         try:
@@ -453,7 +451,7 @@ class MyBookingView(APIView):
 
 class BookingDetailView(APIView):
     """View to retrieve, update, or delete a specific booking"""
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsApprovedUser]
     
     def get_object(self, booking_id, user):
         """Get booking object and verify ownership"""
@@ -484,6 +482,7 @@ class BookingDetailView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
     
+    @transaction.atomic
     def put(self, request, booking_id):
         """Update a booking"""
         try:
@@ -546,17 +545,19 @@ class BookingDetailView(APIView):
                     data.get('end_datetime'),
                 )
             
-            # Check for conflicts (excluding current booking)
-            if 'room_ids' in data and 'start_datetime' in data and 'end_datetime' in data:
-                room_ids = data.get('room_ids', [])
-                start_dt = data.get('start_datetime')
-                end_dt = data.get('end_datetime')
+            # Always validate the complete proposed booking, including unchanged values.
+            room_ids = data.get('room_ids', list(booking.rooms.values_list('id', flat=True)))
+            start_dt = data.get('start_datetime', booking.start_datetime)
+            end_dt = data.get('end_datetime', booking.end_datetime)
                 
-                if isinstance(start_dt, str):
-                    start_dt = datetime.fromisoformat(start_dt.replace('Z', '+00:00'))
-                if isinstance(end_dt, str):
-                    end_dt = datetime.fromisoformat(end_dt.replace('Z', '+00:00'))
+            if isinstance(start_dt, str):
+                start_dt = datetime.fromisoformat(start_dt.replace('Z', '+00:00'))
+            if isinstance(end_dt, str):
+                end_dt = datetime.fromisoformat(end_dt.replace('Z', '+00:00'))
                 
+            from django.db import transaction
+            with transaction.atomic():
+                lock_booking_rooms(room_ids)
                 conflicts = check_booking_conflicts(room_ids, start_dt, end_dt, exclude_booking_id=booking_id)
                 if conflicts:
                     return Response(
@@ -571,6 +572,10 @@ class BookingDetailView(APIView):
                 'status': booking.status,
             }
             
+            material_fields = {'room_ids', 'start_datetime', 'end_datetime', 'booking_type'}
+            if request.user.role != 'admin' and material_fields.intersection(data.keys()):
+                booking.status = 'Pending'
+
             serializer = BookingSerializer(booking, data=data, partial=True, context={'request': request})
             if serializer.is_valid():
                 updated_booking = serializer.save()
@@ -757,9 +762,55 @@ class LoginSerializer(TokenObtainPairSerializer):
 class LoginView(TokenObtainPairView):
     serializer_class = LoginSerializer
     permission_classes = [permissions.AllowAny]  # Allow unauthenticated access for login
+
+    def post(self, request, *args, **kwargs):
+        response = super().post(request, *args, **kwargs)
+        if response.status_code == status.HTTP_200_OK:
+            access = response.data.pop('access')
+            refresh = response.data.pop('refresh')
+            cookie_options = {
+                'httponly': True,
+                'secure': not settings.DEBUG,
+                'samesite': 'Strict',
+            }
+            response.set_cookie('access_token', access, max_age=300, path='/', **cookie_options)
+            response.set_cookie('refresh_token', refresh, max_age=86400, path='/api/auth/', **cookie_options)
+        return response
+
+
+class ApprovedTokenRefreshView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        refresh = request.COOKIES.get('refresh_token')
+        if not refresh:
+            return Response({'detail': 'Refresh token is missing.'}, status=status.HTTP_401_UNAUTHORIZED)
+        serializer = TokenRefreshSerializer(data={'refresh': refresh})
+        serializer.is_valid(raise_exception=True)
+        token = serializer.token_class(refresh)
+        user = User.objects.filter(pk=token.get('user_id'), is_active=True, approval_status='approved').first()
+        if not user:
+            return Response({'detail': 'Account is not approved.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        response = Response({}, status=status.HTTP_200_OK)
+        options = {'httponly': True, 'secure': not settings.DEBUG, 'samesite': 'Strict'}
+        response.set_cookie('access_token', serializer.validated_data['access'], max_age=300, path='/', **options)
+        if 'refresh' in serializer.validated_data:
+            response.set_cookie('refresh_token', serializer.validated_data['refresh'], max_age=86400, path='/api/auth/', **options)
+        return response
+
+
+class LogoutView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        response = Response(status=status.HTTP_204_NO_CONTENT)
+        response.delete_cookie('access_token', path='/')
+        response.delete_cookie('refresh_token', path='/api/auth/')
+        return response
     
 class UserDetailView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsApprovedUser]
 
     def get(self, request):
         try:
@@ -856,13 +907,6 @@ class PasswordResetConfirmView(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
-            # Validate password length
-            if len(new_password) < 8:
-                return Response(
-                    {"detail": "Password must be at least 8 characters long."},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            
             # Decode user ID
             from django.utils.http import urlsafe_base64_decode
             from django.utils.encoding import force_str
@@ -873,6 +917,14 @@ class PasswordResetConfirmView(APIView):
             except (TypeError, ValueError, OverflowError, User.DoesNotExist):
                 return Response(
                     {"detail": "Invalid reset link. Please request a new password reset."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            try:
+                validate_password(new_password, user=user)
+            except Exception as exc:
+                return Response(
+                    {"detail": list(exc.messages)},
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
@@ -1182,7 +1234,7 @@ class UpcomingCampBookingsView(APIView):
 
 class PendingUsersView(APIView):
     """View to list all pending users - Admin only"""
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsApprovedUser]
     
     def get(self, request):
         try:
@@ -1206,7 +1258,7 @@ class PendingUsersView(APIView):
 
 class ApproveUserView(APIView):
     """View to approve/deny users and assign roles - Admin only"""
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsApprovedUser]
     
     def post(self, request, user_id):
         try:
@@ -1270,7 +1322,7 @@ class ApproveUserView(APIView):
 
 class UpdateBookingStatusView(APIView):
     """View to update booking status - Admin only"""
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsApprovedUser]
     
     def post(self, request, booking_id):
         try:
@@ -1329,7 +1381,7 @@ class UpdateBookingStatusView(APIView):
 
 class DeleteAllBookingsView(APIView):
     """View to delete all bookings - Admin only"""
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsApprovedUser]
     
     def delete(self, request):
         try:

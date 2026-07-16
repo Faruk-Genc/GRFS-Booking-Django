@@ -2,6 +2,9 @@ from rest_framework import serializers
 from .models import Booking, Room, Floor, normalize_booking_end_datetime
 from django.contrib.auth import get_user_model
 from django.db.models import Q
+from django.utils import timezone
+from datetime import timedelta
+from django.contrib.auth.password_validation import validate_password
 
 User = get_user_model()
 
@@ -113,8 +116,10 @@ class UserSerializer(serializers.ModelSerializer):
 
     def validate_password(self, value):
         """Validate password strength"""
-        if len(value) < 8:
-            raise serializers.ValidationError("Password must be at least 8 characters long.")
+        try:
+            validate_password(value)
+        except Exception as exc:
+            raise serializers.ValidationError(list(exc.messages)) from exc
         return value
 
     def validate_gender(self, value):
@@ -182,7 +187,7 @@ class UserSerializer(serializers.ModelSerializer):
                         raise serializers.ValidationError({"email": "An account with this email already exists."})
                     elif 'username' in error_str:
                         raise serializers.ValidationError({"username": "An account with this username already exists."})
-                raise serializers.ValidationError({"detail": f"Failed to create account: {str(db_error)}"})
+                raise serializers.ValidationError({"detail": "Failed to create account. Please try again."})
             
             # Send account creation email (don't fail registration if email fails)
             # Wrap in try/except to catch any network/DNS errors
@@ -207,7 +212,7 @@ class UserSerializer(serializers.ModelSerializer):
             logger = logging.getLogger(__name__)
             logger.error(f"Error creating user: {str(e)}", exc_info=True)
             # Re-raise as ValidationError so DRF handles it properly
-            raise serializers.ValidationError({"detail": f"Failed to create user: {str(e)}"})
+            raise serializers.ValidationError({"detail": "Failed to create user. Please try again."})
         
 
 class FloorSerializer(serializers.ModelSerializer):
@@ -266,7 +271,10 @@ class BookingSerializer(serializers.ModelSerializer):
             'start_datetime',
             self.instance.start_datetime if self.instance else None,
         )
-        end_datetime = data.get('end_datetime')
+        end_datetime = data.get(
+            'end_datetime',
+            self.instance.end_datetime if self.instance else None,
+        )
 
         if end_datetime:
             end_datetime = normalize_booking_end_datetime(
@@ -279,6 +287,28 @@ class BookingSerializer(serializers.ModelSerializer):
             if end_datetime <= start_datetime:
                 raise serializers.ValidationError({
                     'end_datetime': 'End datetime must be after start datetime.'
+                })
+
+            if start_datetime < timezone.now():
+                raise serializers.ValidationError({
+                    'start_datetime': 'Cannot create or move bookings into the past.'
+                })
+
+            booking_type = data.get(
+                'booking_type',
+                self.instance.booking_type if self.instance else 'regular',
+            )
+            if booking_type != 'camp':
+                duration = end_datetime - start_datetime
+                if duration < timedelta(hours=1) or duration > timedelta(hours=8):
+                    raise serializers.ValidationError({
+                        'end_datetime': 'Regular bookings must be between 1 and 8 hours.'
+                    })
+
+            request = self.context.get('request')
+            if booking_type == 'camp' and request and request.user.role not in ['mentor', 'coordinator', 'admin']:
+                raise serializers.ValidationError({
+                    'booking_type': 'Only mentors, coordinators, and admins can book camps.'
                 })
         
         return data

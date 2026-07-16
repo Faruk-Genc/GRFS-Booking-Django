@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { getUser } from '../services/api';
+import { getUser, logoutUser } from '../services/api';
 import '../styles/Navbar.css';
 
 const Navbar = () => {
@@ -9,39 +9,22 @@ const Navbar = () => {
   const [user, setUser] = useState(null);
 
   const fetchUser = async () => {
-    const token = localStorage.getItem('access');
-    if (!token) {
-      setUser(null);
-      return;
-    }
-
     try {
       const response = await getUser();
       setUser(response.data);
     } catch (err) {
       // User not logged in or token expired
       setUser(null);
-      // Clear tokens if they're invalid
-      localStorage.removeItem('access');
-      localStorage.removeItem('refresh');
     }
   };
 
   useEffect(() => {
-    // Check if token exists
-    const token = localStorage.getItem('access');
-    if (!token) {
-      setUser(null);
-      return;
-    }
-    
     // Fetch user data when route changes or component mounts
     fetchUser();
   }, [location.pathname]); // Re-fetch when route changes (e.g., after login)
 
-  const handleLogout = () => {
-    localStorage.removeItem('access');
-    localStorage.removeItem('refresh');
+  const handleLogout = async () => {
+    await logoutUser().catch(() => {});
     setUser(null); // Clear user state immediately
     navigate('/login');
   };

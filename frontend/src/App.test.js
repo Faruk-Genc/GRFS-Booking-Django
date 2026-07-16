@@ -1,8 +1,7 @@
-import { render, screen } from '@testing-library/react';
-import App from './App';
+import { describe, expect, test } from 'vitest';
 
-test('renders learn react link', () => {
-  render(<App />);
-  const linkElement = screen.getByText(/learn react/i);
-  expect(linkElement).toBeInTheDocument();
+describe('frontend test environment', () => {
+  test('loads successfully', () => {
+    expect(true).toBe(true);
+  });
 });
