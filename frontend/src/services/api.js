@@ -61,15 +61,19 @@ API.interceptors.response.use(
     }
     
     // If error is 401 and we haven't already retried
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    const isAuthRequest = originalRequest.url?.includes('auth/login/')
+      || originalRequest.url?.includes('auth/register/')
+      || originalRequest.url?.includes('auth/refresh/');
+
+    if (error.response?.status === 401 && !originalRequest._retry && !isAuthRequest) {
       originalRequest._retry = true;
       
       try {
         await axios.post(`${API_BASE_URL}auth/refresh/`, {}, { withCredentials: true });
         return API(originalRequest);
       } catch (refreshError) {
-        // Refresh failed, redirect to login
-        window.location.href = '/login';
+        // Refresh failed. The calling route decides whether to show or navigate
+        // to login; forcing a page reload here creates an authentication loop.
         return Promise.reject(refreshError);
       }
     }
