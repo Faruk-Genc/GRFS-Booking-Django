@@ -529,9 +529,17 @@
 .venue-calendar .fc-event-title { overflow: hidden; text-overflow: ellipsis; }
 .venue-calendar .fc-daygrid-more-link { color: #1a3970; }
 .venue-event-content { min-width: 0; width: 100%; }
-.venue-event-time { display: block; white-space: normal; overflow-wrap: anywhere; font-size: 12px; line-height: 1.35; }
-.venue-event-label { display: block; white-space: normal; overflow-wrap: anywhere; line-height: 1.35; }
-.venue-calendar .fc-daygrid-event { white-space: normal; align-items: flex-start; }
+.venue-event-time { display: block; white-space: nowrap; font-size: 12px; line-height: 1.35; }
+.venue-event-label { display: block; white-space: nowrap; line-height: 1.35; }
+.venue-calendar .fc-timegrid-event .fc-event-main { overflow-x: auto; }
+.venue-calendar .fc-daygrid-day-top { display: block; }
+.venue-calendar .fc-daygrid-day-number { display: block; padding: 0; width: 100%; }
+.venue-month-cell { min-width: 0; }
+.venue-day-number { display: block; text-align: right; padding: 8px; }
+.venue-day-bookings { max-width: 100%; height: 112px; overflow: auto; padding: 2px 3px 8px; box-sizing: border-box; }
+.venue-day-bookings:focus-visible { outline: 2px solid #1a3970; outline-offset: -2px; }
+.venue-month-booking { display: block; width: max-content; min-width: 100%; border: 0; border-radius: 4px; margin: 0 0 4px; padding: 4px 6px; color: #172033; text-align: left; font: inherit; cursor: pointer; box-sizing: border-box; }
+.venue-month-booking strong, .venue-month-booking span { display: block; white-space: nowrap; line-height: 17px; font-size: 12px; }
 
 /* Legend */
 .booking-legend {

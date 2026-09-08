@@ -61,7 +61,7 @@ export default function BookingCalendar({ bookings, currentDate, viewMode, selec
         title: camp ? `Camp Booking - Downstairs - ${name}` : `${location} - ${name}`,
         backgroundColor: color, borderColor: color, textColor: '#172033',
         classNames: [camp ? 'venue-camp-event' : 'venue-room-event'],
-        extendedProps: { booking, timeLabel: `${compactTime(start)}-${compactTime(end, true)}`,
+        extendedProps: { booking, name, location, timeLabel: `${compactTime(start)}-${compactTime(end, true)}`,
           range: `${start.replace('T', ' ')} → ${end.replace('T', ' ')}` },
       };
     });
@@ -69,13 +69,30 @@ export default function BookingCalendar({ bookings, currentDate, viewMode, selec
     <p className="venue-calendar-help">Camps span their full dates. Click any booking for exact times and approval controls. All times are Toronto time.</p>
     <FullCalendar ref={ref} plugins={[dayGridPlugin, timeGridPlugin]}
       initialView={view} initialDate={currentDate} headerToolbar={false}
-      timeZone="UTC" events={events} height="auto" dayMaxEvents={4}
+      timeZone="UTC" events={viewMode === 'month' ? events.filter(event => event.allDay) : events} height="auto" dayMaxEvents={4}
+      dayCellContent={info => {
+        if (viewMode !== 'month') return info.dayNumberText;
+        const day = info.date.toISOString().slice(0, 10);
+        const regular = events.filter(event => !event.allDay && event.start.slice(0, 10) <= day && event.end.slice(0, 10) >= day)
+          .sort((a, b) => a.start.localeCompare(b.start));
+        return <div className="venue-month-cell">
+          <span className="venue-day-number">{info.dayNumberText}</span>
+          <div className="venue-day-bookings" tabIndex={0} role="region" aria-label={`Room bookings for ${day}; scroll for details`}>
+            {regular.map(event => <button type="button" key={event.id}
+              className="venue-month-booking" style={{ backgroundColor: event.backgroundColor }}
+              onClick={() => onBookingClick(event.extendedProps.booking)}>
+              <strong>{event.extendedProps.timeLabel} - {event.extendedProps.name}</strong>
+              <span>{event.extendedProps.location}</span>
+            </button>)}
+          </div>
+        </div>;
+      }}
       allDayText="Camps" slotDuration="01:00:00" scrollTime="08:00:00"
       eventDisplay="block" displayEventEnd={true} nowIndicator={true}
       eventOrder="-duration,start,title" eventMinHeight={24}
       eventContent={info => <div className="venue-event-content">
-        {!info.event.allDay && <strong className="venue-event-time">{info.event.extendedProps.timeLabel}</strong>}
-        <span className="venue-event-label">{info.event.title}</span>
+        {!info.event.allDay && <strong className="venue-event-time">{info.event.extendedProps.timeLabel} - {info.event.extendedProps.name}</strong>}
+        <span className="venue-event-label">{info.event.allDay ? info.event.title : info.event.extendedProps.location}</span>
       </div>}
       eventClick={info => onBookingClick(info.event.extendedProps.booking)}
       eventDidMount={info => {
