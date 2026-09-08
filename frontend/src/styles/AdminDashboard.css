@@ -517,6 +517,18 @@
   .camp-stay-range { gap: 12px; font-size: 13px; }
 }
 
+.venue-calendar { padding: 20px; overflow-x: auto; }
+.venue-calendar-help { color: #586579; font-size: 13px; margin: 0 0 16px; }
+.venue-calendar .fc { min-width: 620px; --fc-border-color: #e2e7ee; --fc-today-bg-color: #f0f5ff; --fc-page-bg-color: #fff; font-size: 13px; }
+.venue-calendar .fc-col-header-cell { padding: 12px 0; background: #f7f9fc; color: #34445c; }
+.venue-calendar .fc-daygrid-day-number { padding: 10px; }
+.venue-calendar .fc-event { cursor: pointer; border-radius: 4px; padding: 2px 4px; }
+.venue-calendar .venue-camp-event { font-weight: 650; border-top-width: 3px; border-bottom-width: 3px; }
+.venue-calendar .venue-room-event { font-weight: 400; }
+.venue-calendar .fc-timegrid-slot { height: 44px; }
+.venue-calendar .fc-event-title { overflow: hidden; text-overflow: ellipsis; }
+.venue-calendar .fc-daygrid-more-link { color: #1a3970; }
+
 /* Legend */
 .booking-legend {
   display: flex;

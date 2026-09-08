@@ -306,6 +306,15 @@ class BookingSerializer(serializers.ModelSerializer):
                     })
 
             request = self.context.get('request')
+            if booking_type == 'camp' and (
+                not self.instance or start_datetime != self.instance.start_datetime
+                or self.instance.booking_type != 'camp'
+            ):
+                earliest = timezone.localdate() + timedelta(days=5)
+                if timezone.localdate(start_datetime) < earliest:
+                    raise serializers.ValidationError({
+                        'detail': f'Camp bookings require at least 5 calendar days notice. Earliest start date: {earliest.isoformat()}.'
+                    })
             if booking_type != 'camp' and request:
                 owner = self.instance.user if self.instance else request.user
                 # Both creation and editing validate inside a transaction. Lock

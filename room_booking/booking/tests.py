@@ -223,6 +223,23 @@ class AvailableRoomsViewTests(APITestCase):
 
 
 class BookingSecurityTests(APITestCase):
+    def test_camp_notice_uses_calendar_days_not_elapsed_hours(self):
+        from unittest.mock import patch
+        self.user.role = 'mentor'
+        self.user.save()
+        est = pytz.timezone('America/New_York')
+        now = est.localize(datetime(2030, 1, 10, 23, 30))
+        with patch('django.utils.timezone.now', return_value=now):
+            for day, expected in [(14, 400), (15, 201)]:
+                with self.subTest(day=day):
+                    start = est.localize(datetime(2030, 1, day, 1))
+                    response = self.client.post(reverse('create-booking'), {
+                        'room_ids': [self.room.id], 'booking_type': 'camp',
+                        'start_datetime': start.isoformat(),
+                        'end_datetime': (start + timedelta(days=1)).isoformat(),
+                    }, format='json')
+                    self.assertEqual(response.status_code, expected, response.data)
+
     def setUp(self):
         User = get_user_model()
         self.user = User.objects.create_user(

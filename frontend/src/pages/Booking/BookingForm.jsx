@@ -43,6 +43,12 @@ const BookingForm = () => {
 
   // Get today's date in YYYY-MM-DD format for min date
   const today = getLocalDateValue();
+  const venueToday = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Toronto', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(new Date());
+  const campMinimum = new Date(`${venueToday}T12:00:00Z`);
+  campMinimum.setUTCDate(campMinimum.getUTCDate() + 5);
+  const earliestCampDate = campMinimum.toISOString().slice(0, 10);
 
   // Memoize fetchAvailability to prevent recreating on every render
   const fetchAvailability = useCallback(async () => {
@@ -160,6 +166,10 @@ const BookingForm = () => {
     
     if (isCampBooking) {
       // Camp booking validation
+      if (selectedDate && selectedDate < earliestCampDate) {
+        setError(`Camp bookings require at least 5 calendar days notice. Earliest start date: ${earliestCampDate}.`);
+        return;
+      }
       if (!selectedDate || !selectedEndDate || !startTime || !endTime) {
         setError('Please select start date, end date, start time, and end time');
         return;
@@ -338,7 +348,7 @@ const BookingForm = () => {
               marginBottom: '20px',
               border: '2px solid #1a3970'
             }}>
-              <strong>Camp Booking:</strong> This booking will require admin approval. You can select different start and end dates.
+              <strong>Camp Booking:</strong> This booking will require admin approval. Choose a start date at least 5 calendar days from today.
             </div>
           )}
           
@@ -350,7 +360,7 @@ const BookingForm = () => {
               id="date"
               value={selectedDate}
               onChange={handleDateChange}
-              min={today}
+              min={isCampBooking ? earliestCampDate : today}
               required
               className="form-input date-input"
             />

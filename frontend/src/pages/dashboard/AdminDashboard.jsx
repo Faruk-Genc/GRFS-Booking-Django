@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { getAllBookings, getRooms, deleteBooking, updateBooking, checkAvailability, getPendingUsers, approveUser, updateBookingStatus, deleteAllBookings } from '../../services/api';
 import '../../styles/AdminDashboard.css';
+import BookingCalendar from '../../components/BookingCalendar';
 
 const AdminDashboard = () => {
   const [bookings, setBookings] = useState([]);
@@ -527,181 +528,6 @@ const AdminDashboard = () => {
     return days;
   };
 
-  const renderDayView = () => {
-    const hours = Array.from({ length: 24 }, (_, i) => i);
-    const dayBookings = getBookingsForDate(currentDate);
-
-    return (
-      <div className="calendar-day-view">
-        <div className="calendar-day-header">
-          <h2>{currentDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</h2>
-        </div>
-        <div className="calendar-hours">
-          {hours.map(hour => {
-            const hourBookings = getBookingsForTimeSlot(currentDate, hour).filter(b => b.booking_type !== 'camp');
-            return (
-              <div key={hour} className="calendar-hour-row">
-                <div className="hour-label">{formatHour(hour)}</div>
-                <div className="hour-content">
-                  {hourBookings.map(booking => (
-                    <div 
-                      key={booking.id} 
-                      className={`booking-event booking-${booking.status.toLowerCase()} ${getBookingGenderClass(booking)}`}
-                      onClick={() => handleBookingClick(booking)}
-                    >
-                      <div className="booking-event-title">
-                        {getBookingLocationLabel(booking)}
-                      </div>
-                      <div className="booking-event-details">
-                        {formatTime(booking.start_datetime)} - {formatTime(booking.end_datetime)}
-                      </div>
-                      <div className="booking-event-user">
-                        {booking.user.username}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
-  };
-
-  const renderWeekView = () => {
-    const weekDays = getWeekDays();
-    const hours = Array.from({ length: 24 }, (_, i) => i);
-
-    return (
-      <div className="calendar-week-view">
-        <div className="calendar-week-header">
-          <div className="week-hour-label"></div>
-          {weekDays.map((day, idx) => (
-            <div key={idx} className="week-day-header">
-              <div className="week-day-name">{day.toLocaleDateString('en-US', { weekday: 'short' })}</div>
-              <div className="week-day-number">{day.getDate()}</div>
-            </div>
-          ))}
-        </div>
-        <div className="calendar-week-body">
-          {hours.map(hour => (
-            <div key={hour} className="week-hour-row">
-              <div className="week-hour-label">{formatHour(hour)}</div>
-              {weekDays.map((day, dayIdx) => {
-                const hourBookings = getBookingsForTimeSlot(day, hour).filter(b => b.booking_type !== 'camp');
-                return (
-                  <div key={dayIdx} className="week-hour-cell">
-                    {hourBookings.map(booking => (
-                      <div 
-                        key={booking.id} 
-                      className={`booking-event booking-${booking.status.toLowerCase()} ${getBookingGenderClass(booking)}`}
-                        onClick={() => handleBookingClick(booking)}
-                      >
-                        <div className="booking-event-title">
-                        {getBookingLocationLabel(booking)}
-                        </div>
-                        <div className="booking-event-time">
-                          {formatTime(booking.start_datetime)} - {formatTime(booking.end_datetime)}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                );
-              })}
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  };
-
-  const renderMonthView = () => {
-    const monthDays = getMonthDays();
-    const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
-    return (
-      <div className="calendar-month-view">
-        <div className="calendar-month-header">
-          {weekDays.map(day => (
-            <div key={day} className="month-day-header">{day}</div>
-          ))}
-        </div>
-        <div className="calendar-month-body">
-          {monthDays.map((day, idx) => {
-            if (!day) {
-              return <div key={idx} className="month-day-cell empty"></div>;
-            }
-            const dayBookings = getBookingsForDate(day).filter(b => b.booking_type !== 'camp');
-            const isToday = day.toDateString() === new Date().toDateString();
-            
-            return (
-              <div key={idx} className={`month-day-cell ${isToday ? 'today' : ''}`}>
-                <div className="month-day-number">{day.getDate()}</div>
-                <div className="month-day-bookings">
-                  {dayBookings.map(booking => (
-                    <div 
-                      key={booking.id} 
-                      className={`booking-event-small booking-${booking.status.toLowerCase()} ${getBookingGenderClass(booking)}`}
-                      onClick={() => handleBookingClick(booking)}
-                    >
-                      <span className="booking-time-small">
-                        {formatTime(booking.start_datetime)} - {formatTime(booking.end_datetime)}
-                      </span>
-                      <span className="booking-room-small">
-                        {getBookingLocationLabel(booking)} - {booking.user.first_name} {booking.user.last_name}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
-  };
-
-  const renderCampSchedule = () => {
-    const start = new Date(currentDate);
-    start.setHours(0, 0, 0, 0);
-    if (viewMode === 'month') start.setDate(1);
-    if (viewMode === 'week') start.setDate(start.getDate() - start.getDay());
-    const end = new Date(start);
-    if (viewMode === 'month') end.setMonth(end.getMonth() + 1);
-    else end.setDate(end.getDate() + (viewMode === 'week' ? 7 : 1));
-    const camps = bookings.filter(booking =>
-      booking.booking_type === 'camp'
-      && new Date(booking.start_datetime) < end
-      && new Date(booking.end_datetime) > start
-      && (!selectedRoomId || booking.rooms.some(room => room.id === Number(selectedRoomId)))
-    ).sort((a, b) => new Date(a.start_datetime) - new Date(b.start_datetime));
-
-    return (
-      <section className="admin-camp-schedule" aria-labelledby="camp-schedule-title">
-        <div className="schedule-section-heading">
-          <div><h2 id="camp-schedule-title">Camp bookings</h2><p>Full stays overlapping this {viewMode} · each card is one booking</p></div>
-          <span className="camp-count">{camps.length} camps</span>
-        </div>
-        {camps.length === 0 ? <p className="camp-empty">No camps in this period.</p> : camps.map(booking => (
-          <button type="button" key={booking.id}
-            className={`admin-camp-card booking-${booking.status.toLowerCase()} ${getBookingGenderClass(booking)}`}
-            onClick={() => handleBookingClick(booking)}>
-            <div className="camp-card-heading">
-              <strong>{getBookingLocationLabel(booking)}</strong>
-              <span>{booking.status === 'Pending' ? 'Pending approval' : booking.status} · #{booking.id}</span>
-            </div>
-            <div className="camp-stay-range">
-              <div><small>START</small><strong>{formatDate(booking.start_datetime)}</strong><span>{formatTime(booking.start_datetime)}</span></div>
-              <span className="camp-stay-connector" aria-hidden="true">→</span>
-              <div><small>END</small><strong>{formatDate(booking.end_datetime)}</strong><span>{formatTime(booking.end_datetime)}</span></div>
-            </div>
-            <div className="camp-card-footer"><span>{booking.user.first_name} {booking.user.last_name} · {booking.rooms.length} rooms</span><span>View booking →</span></div>
-          </button>
-        ))}
-      </section>
-    );
-  };
 
   if (loading) {
     return <div className="admin-dashboard-loading">Loading bookings...</div>;
@@ -874,11 +700,8 @@ const AdminDashboard = () => {
       )}
 
       <div className="calendar-container">
-        {renderCampSchedule()}
-        <div className="schedule-section-heading regular-schedule-heading"><div><h2>Regular room bookings</h2><p>Room reservations by time and date</p></div></div>
-        {viewMode === 'day' && renderDayView()}
-        {viewMode === 'week' && renderWeekView()}
-        {viewMode === 'month' && renderMonthView()}
+        <BookingCalendar bookings={bookings} currentDate={currentDate} viewMode={viewMode}
+          selectedRoomId={selectedRoomId} onBookingClick={handleBookingClick} />
       </div>
 
       <div className="booking-legend">
