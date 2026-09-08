@@ -148,8 +148,9 @@ const BookingForm = () => {
     e.preventDefault();
     
     // Check if user is authenticated before submitting
+    let currentUser;
     try {
-      await getUser();
+      currentUser = (await getUser()).data;
     } catch (err) {
       // User is not authenticated, redirect to login
       alert('Please log in to complete your booking.');
@@ -214,6 +215,13 @@ const BookingForm = () => {
       const startDatetime = `${startDate}T${String(startHour).padStart(2, '0')}:00:00`;
       const endDatetime = `${endDate}T${String(endHour).padStart(2, '0')}:${String(endMinute).padStart(2, '0')}:00`;
 
+      const durationHours = endHour + endMinute / 60 - startHour;
+      const requiresApproval = currentUser.role !== 'admin'
+        && (isCampBooking || durationHours >= 8 || new Set(roomIds).size > 2);
+      if (requiresApproval && !window.confirm('Bu bookingi Abdurrahman abi ile dogruladiniz mi')) {
+        return;
+      }
+
       const response = await createBooking({
         room_ids: roomIds,
         start_datetime: startDatetime,
@@ -222,7 +230,9 @@ const BookingForm = () => {
       });
 
       // Success - navigate to success page or dashboard
-      alert(isCampBooking ? 'Camp booking created successfully! It will be reviewed by an admin.' : 'Booking created successfully!');
+      alert(response.data.status === 'Pending'
+        ? "Your booking hasn't been confirmed yet. It is pending admin approval."
+        : 'Booking confirmed successfully!');
       navigate('/bookingpage');
     } catch (err) {
       if (err.response?.status === 409) {

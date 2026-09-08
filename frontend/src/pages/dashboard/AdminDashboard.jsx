@@ -538,7 +538,7 @@ const AdminDashboard = () => {
         </div>
         <div className="calendar-hours">
           {hours.map(hour => {
-            const hourBookings = getBookingsForTimeSlot(currentDate, hour);
+            const hourBookings = getBookingsForTimeSlot(currentDate, hour).filter(b => b.booking_type !== 'camp');
             return (
               <div key={hour} className="calendar-hour-row">
                 <div className="hour-label">{formatHour(hour)}</div>
@@ -589,7 +589,7 @@ const AdminDashboard = () => {
             <div key={hour} className="week-hour-row">
               <div className="week-hour-label">{formatHour(hour)}</div>
               {weekDays.map((day, dayIdx) => {
-                const hourBookings = getBookingsForTimeSlot(day, hour);
+                const hourBookings = getBookingsForTimeSlot(day, hour).filter(b => b.booking_type !== 'camp');
                 return (
                   <div key={dayIdx} className="week-hour-cell">
                     {hourBookings.map(booking => (
@@ -632,7 +632,7 @@ const AdminDashboard = () => {
             if (!day) {
               return <div key={idx} className="month-day-cell empty"></div>;
             }
-            const dayBookings = getBookingsForDate(day);
+            const dayBookings = getBookingsForDate(day).filter(b => b.booking_type !== 'camp');
             const isToday = day.toDateString() === new Date().toDateString();
             
             return (
@@ -659,6 +659,47 @@ const AdminDashboard = () => {
           })}
         </div>
       </div>
+    );
+  };
+
+  const renderCampSchedule = () => {
+    const start = new Date(currentDate);
+    start.setHours(0, 0, 0, 0);
+    if (viewMode === 'month') start.setDate(1);
+    if (viewMode === 'week') start.setDate(start.getDate() - start.getDay());
+    const end = new Date(start);
+    if (viewMode === 'month') end.setMonth(end.getMonth() + 1);
+    else end.setDate(end.getDate() + (viewMode === 'week' ? 7 : 1));
+    const camps = bookings.filter(booking =>
+      booking.booking_type === 'camp'
+      && new Date(booking.start_datetime) < end
+      && new Date(booking.end_datetime) > start
+      && (!selectedRoomId || booking.rooms.some(room => room.id === Number(selectedRoomId)))
+    ).sort((a, b) => new Date(a.start_datetime) - new Date(b.start_datetime));
+
+    return (
+      <section className="admin-camp-schedule" aria-labelledby="camp-schedule-title">
+        <div className="schedule-section-heading">
+          <div><h2 id="camp-schedule-title">Camp bookings</h2><p>Full stays overlapping this {viewMode} · each card is one booking</p></div>
+          <span className="camp-count">{camps.length} camps</span>
+        </div>
+        {camps.length === 0 ? <p className="camp-empty">No camps in this period.</p> : camps.map(booking => (
+          <button type="button" key={booking.id}
+            className={`admin-camp-card booking-${booking.status.toLowerCase()} ${getBookingGenderClass(booking)}`}
+            onClick={() => handleBookingClick(booking)}>
+            <div className="camp-card-heading">
+              <strong>{getBookingLocationLabel(booking)}</strong>
+              <span>{booking.status === 'Pending' ? 'Pending approval' : booking.status} · #{booking.id}</span>
+            </div>
+            <div className="camp-stay-range">
+              <div><small>START</small><strong>{formatDate(booking.start_datetime)}</strong><span>{formatTime(booking.start_datetime)}</span></div>
+              <span className="camp-stay-connector" aria-hidden="true">→</span>
+              <div><small>END</small><strong>{formatDate(booking.end_datetime)}</strong><span>{formatTime(booking.end_datetime)}</span></div>
+            </div>
+            <div className="camp-card-footer"><span>{booking.user.first_name} {booking.user.last_name} · {booking.rooms.length} rooms</span><span>View booking →</span></div>
+          </button>
+        ))}
+      </section>
     );
   };
 
@@ -833,6 +874,8 @@ const AdminDashboard = () => {
       )}
 
       <div className="calendar-container">
+        {renderCampSchedule()}
+        <div className="schedule-section-heading regular-schedule-heading"><div><h2>Regular room bookings</h2><p>Room reservations by time and date</p></div></div>
         {viewMode === 'day' && renderDayView()}
         {viewMode === 'week' && renderWeekView()}
         {viewMode === 'month' && renderMonthView()}

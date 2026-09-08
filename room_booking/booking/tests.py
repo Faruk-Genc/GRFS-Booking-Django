@@ -124,7 +124,8 @@ class CampBookingWarningTests(APITestCase):
         booking.rooms.add(self.room)
         return booking
 
-    def test_approved_camp_is_public_five_days_before_start(self):
+    def test_approved_camp_visible_to_logged_in_user_five_days_before_start(self):
+        self.client.force_authenticate(self.user)
         camp = self.create_camp(4)
 
         response = self.client.get(reverse("camp-booking-warnings"))
@@ -135,6 +136,7 @@ class CampBookingWarningTests(APITestCase):
         self.assertEqual(response.data[0]["gender"], "Male")
 
     def test_future_and_pending_camps_are_not_shown(self):
+        self.client.force_authenticate(self.user)
         self.create_camp(6)
         self.create_camp(2, status="Pending")
 
@@ -142,6 +144,11 @@ class CampBookingWarningTests(APITestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data, [])
+
+    def test_camp_notices_require_login(self):
+        self.create_camp(4)
+        response = self.client.get(reverse('camp-booking-warnings'))
+        self.assertEqual(response.status_code, 401)
 
 
 class AvailableRoomsViewTests(APITestCase):
@@ -282,3 +289,55 @@ class BookingSecurityTests(APITestCase):
         self.user.save(update_fields=['approval_status'])
         response = self.client.get(reverse('my-bookings'))
         self.assertEqual(response.status_code, 403)
+
+    def test_consecutive_limit_on_create(self):
+        start = timezone.now().replace(microsecond=0) + timedelta(days=5)
+        existing = Booking.objects.create(
+            user=self.user, start_datetime=start,
+            end_datetime=start + timedelta(hours=6), status='Pending',
+        )
+        existing.rooms.add(self.room)
+        for duration, expected in [(3, 400), (2, 201)]:
+            with self.subTest(duration=duration):
+                response = self.client.post(reverse('create-booking'), {
+                    'room_ids': [self.other_room.id],
+                    'start_datetime': (start + timedelta(hours=6)).isoformat(),
+                    'end_datetime': (start + timedelta(hours=6 + duration)).isoformat(),
+                }, format='json')
+                self.assertEqual(response.status_code, expected, response.data)
+
+    def test_edit_cannot_bridge_two_bookings_into_overlong_chain(self):
+        start = timezone.now().replace(microsecond=0) + timedelta(days=5)
+        for offset in [0, 6]:
+            booking = Booking.objects.create(
+                user=self.user, start_datetime=start + timedelta(hours=offset),
+                end_datetime=start + timedelta(hours=offset + 3), status='Approved',
+            )
+            booking.rooms.add(self.room)
+        editable = Booking.objects.create(
+            user=self.user, start_datetime=start + timedelta(days=1),
+            end_datetime=start + timedelta(days=1, hours=3), status='Approved',
+        )
+        editable.rooms.add(self.other_room)
+        response = self.client.put(reverse('booking-detail', args=[editable.id]), {
+            'start_datetime': (start + timedelta(hours=3)).isoformat(),
+            'end_datetime': (start + timedelta(hours=6)).isoformat(),
+        }, format='json')
+        self.assertEqual(response.status_code, 400, response.data)
+        editable.refresh_from_db()
+        self.assertEqual(editable.start_datetime, start + timedelta(days=1))
+
+    def test_cancelled_and_other_users_bookings_do_not_extend_chain(self):
+        start = timezone.now().replace(microsecond=0) + timedelta(days=5)
+        for owner, booking_status in [(self.user, 'Cancelled'), (self.other_user, 'Approved')]:
+            booking = Booking.objects.create(
+                user=owner, start_datetime=start,
+                end_datetime=start + timedelta(hours=6), status=booking_status,
+            )
+            booking.rooms.add(self.room)
+        response = self.client.post(reverse('create-booking'), {
+            'room_ids': [self.other_room.id],
+            'start_datetime': (start + timedelta(hours=6)).isoformat(),
+            'end_datetime': (start + timedelta(hours=9)).isoformat(),
+        }, format='json')
+        self.assertEqual(response.status_code, 201, response.data)

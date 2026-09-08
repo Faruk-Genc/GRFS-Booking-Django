@@ -306,6 +306,32 @@ class BookingSerializer(serializers.ModelSerializer):
                     })
 
             request = self.context.get('request')
+            if booking_type != 'camp' and request:
+                owner = self.instance.user if self.instance else request.user
+                # Both creation and editing validate inside a transaction. Lock
+                # the owner so simultaneous requests in different rooms serialize.
+                User.objects.select_for_update().get(pk=owner.pk)
+                adjacent = Booking.objects.filter(
+                    user=owner, booking_type='regular',
+                    status__in=['Pending', 'Approved'],
+                    start_datetime__isnull=False, end_datetime__isnull=False,
+                )
+                if self.instance:
+                    adjacent = adjacent.exclude(pk=self.instance.pk)
+                intervals = list(adjacent.values_list('start_datetime', 'end_datetime'))
+                chain_start, chain_end = start_datetime, end_datetime
+                while True:
+                    previous = (chain_start, chain_end)
+                    for existing_start, existing_end in intervals:
+                        if existing_start <= chain_end and existing_end >= chain_start:
+                            chain_start = min(chain_start, existing_start)
+                            chain_end = max(chain_end, existing_end)
+                    if previous == (chain_start, chain_end):
+                        break
+                if chain_end - chain_start > timedelta(hours=8):
+                    raise serializers.ValidationError({
+                        'detail': 'Consecutive bookings cannot exceed 8 hours in total, even across different rooms.'
+                    })
             if booking_type == 'camp' and request and request.user.role not in ['mentor', 'coordinator', 'admin']:
                 raise serializers.ValidationError({
                     'booking_type': 'Only mentors, coordinators, and admins can book camps.'

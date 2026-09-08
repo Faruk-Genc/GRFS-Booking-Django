@@ -63,17 +63,23 @@ const BookingPage = () => {
   }, []);
 
   useEffect(() => {
+    if (!user) {
+      setCampWarnings([]);
+      return;
+    }
+    let active = true;
     const fetchCampWarnings = async () => {
       try {
         const response = await getCampBookingWarnings();
-        setCampWarnings(response.data);
+        if (active) setCampWarnings(response.data);
       } catch (err) {
         console.error('Failed to fetch camp booking warnings:', err);
       }
     };
 
     fetchCampWarnings();
-  }, []);
+    return () => { active = false; };
+  }, [user]);
 
   useEffect(() => {
     // Fetch floors data from your API
@@ -311,7 +317,7 @@ const BookingPage = () => {
     <div className="container">
       <h2>Building Rooms</h2>
 
-      {campWarnings.length > 0 && (
+      {user && campWarnings.length > 0 && (
         <div className="camp-warning-list" aria-live="polite">
           {campWarnings.map((camp) => (
             <div className="camp-warning" key={camp.id}>

@@ -1210,7 +1210,7 @@ class AvailableRoomsView(APIView):
 
 
 class UpcomingCampBookingsView(APIView):
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [IsApprovedUser]
 
     def get(self, request):
         now = timezone.now()
