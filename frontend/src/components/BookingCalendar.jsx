@@ -13,6 +13,23 @@ const venueDateTime = value => {
   return `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}:${p.second}`;
 };
 
+const compactTime = (value, isEnd = false) => {
+  const hour = Number(value.slice(11, 13));
+  const minute = value.slice(14, 16);
+  if (isEnd && hour === 23 && minute === '59') return '12';
+  return `${hour % 12 || 12}${minute === '00' ? '' : `:${minute}`}${hour < 12 ? 'am' : 'pm'}`;
+};
+
+const groupedRooms = rooms => {
+  const floors = new Map();
+  rooms.forEach(room => {
+    const floor = room.floor?.name || 'Rooms';
+    if (!floors.has(floor)) floors.set(floor, []);
+    floors.get(floor).push(room.name);
+  });
+  return [...floors].map(([floor, names]) => `${floor}: ${names.join(', ')}`).join(' - ');
+};
+
 export default function BookingCalendar({ bookings, currentDate, viewMode, selectedRoomId, onBookingClick }) {
   const ref = useRef(null);
   const view = { month: 'dayGridMonth', week: 'timeGridWeek', day: 'timeGridDay' }[viewMode];
@@ -36,14 +53,16 @@ export default function BookingCalendar({ bookings, currentDate, viewMode, selec
       const color = booking.status === 'Pending' ? '#ff9800'
         : camp && booking.user.gender === 'male' ? '#2196f3'
         : camp && booking.user.gender === 'female' ? '#e91e63' : '#4caf50';
-      const location = booking.rooms.map(r => `${r.floor?.name || ''} ${r.name}`).join(', ');
+      const location = groupedRooms(booking.rooms);
+      const name = [booking.user.first_name, booking.user.last_name].filter(Boolean).join(' ') || booking.user.username;
       return {
         id: String(booking.id), start: camp ? start.slice(0, 10) : start,
         end: displayEnd, allDay: camp,
-        title: `${camp ? 'Camp · ' : ''}${location} · ${booking.user.first_name || booking.user.username}`,
+        title: camp ? `Camp Booking - Downstairs - ${name}` : `${location} - ${name}`,
         backgroundColor: color, borderColor: color, textColor: '#172033',
         classNames: [camp ? 'venue-camp-event' : 'venue-room-event'],
-        extendedProps: { booking, range: `${start.replace('T', ' ')} → ${end.replace('T', ' ')}` },
+        extendedProps: { booking, timeLabel: `${compactTime(start)}-${compactTime(end, true)}`,
+          range: `${start.replace('T', ' ')} → ${end.replace('T', ' ')}` },
       };
     });
   return <div className="venue-calendar">
@@ -54,6 +73,10 @@ export default function BookingCalendar({ bookings, currentDate, viewMode, selec
       allDayText="Camps" slotDuration="01:00:00" scrollTime="08:00:00"
       eventDisplay="block" displayEventEnd={true} nowIndicator={true}
       eventOrder="-duration,start,title" eventMinHeight={24}
+      eventContent={info => <div className="venue-event-content">
+        {!info.event.allDay && <strong className="venue-event-time">{info.event.extendedProps.timeLabel}</strong>}
+        <span className="venue-event-label">{info.event.title}</span>
+      </div>}
       eventClick={info => onBookingClick(info.event.extendedProps.booking)}
       eventDidMount={info => {
         info.el.title = `${info.event.title}\n${info.event.extendedProps.range}\n${info.event.extendedProps.booking.status}`;

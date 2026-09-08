@@ -528,6 +528,10 @@
 .venue-calendar .fc-timegrid-slot { height: 44px; }
 .venue-calendar .fc-event-title { overflow: hidden; text-overflow: ellipsis; }
 .venue-calendar .fc-daygrid-more-link { color: #1a3970; }
+.venue-event-content { min-width: 0; width: 100%; }
+.venue-event-time { display: block; white-space: normal; overflow-wrap: anywhere; font-size: 12px; line-height: 1.35; }
+.venue-event-label { display: block; white-space: normal; overflow-wrap: anywhere; line-height: 1.35; }
+.venue-calendar .fc-daygrid-event { white-space: normal; align-items: flex-start; }
 
 /* Legend */
 .booking-legend {
