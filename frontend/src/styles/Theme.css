@@ -23,8 +23,8 @@ input[type=checkbox], input[type=radio] { accent-color: var(--brand); }
 .navbar-brand { gap: 12px; font-size: 22px; letter-spacing: .03em; }
 .navbar-brand-text { color: var(--ink); line-height: 1.1; }
 .brand-caption { display: block; font-size: 10px; letter-spacing: .08em; font-weight: 500; margin-top: 6px; text-transform: uppercase; }
-.brand-symbol { display: flex; align-items: center; justify-content: center; background: var(--brand); color: #fff; border-radius: 13px 13px 3px 13px; width: 44px; height: 44px; font-size: 26px; }
-.brand-symbol span { color: #ffffff; font-size: 18px; }
+/* The square source has generous blank margins; crop only that whitespace. */
+.grfs-brand-logo { display: block; width: 144px; height: 80px; object-fit: cover; object-position: center; }
 .navbar-menu { gap: 6px; }
 .navbar .navbar-link { color: #555555; font-size: 13px; font-weight: 600; border-radius: 8px; padding: 10px 14px; }
 .navbar .navbar-link:hover, .navbar .navbar-link.active { background: var(--soft); color: var(--brand-dark); }

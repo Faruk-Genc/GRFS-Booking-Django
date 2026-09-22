@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { getUser, logoutUser } from '../services/api';
 import '../styles/Navbar.css';
+import grfsLogo from '../assets/grfs-logo.png';
 
 const Navbar = () => {
   const navigate = useNavigate();
@@ -35,8 +36,7 @@ const Navbar = () => {
       <div className="navbar-container">
         <Link to="/" className="navbar-brand">
           
-          <span className="brand-symbol" aria-hidden="true">G<span>+</span></span>
-          <span className="navbar-brand-text">GRFS<span className="brand-caption">Community spaces</span></span>
+          <img className="grfs-brand-logo" src={grfsLogo} alt="Grand River Friendship Society" width="144" height="80" />
         </Link>
         <div className="navbar-menu">
           {user ? (
