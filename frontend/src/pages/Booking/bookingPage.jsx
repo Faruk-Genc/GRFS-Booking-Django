@@ -315,14 +315,7 @@ const BookingPage = () => {
 
   return (
     <div className="container">
-      <header className="spaces-hero">
-        <div><span className="eyebrow">YOUR COMMUNITY. YOUR SPACE.</span>
-          <h1>Make room for<br />something meaningful.</h1>
-          <p>Find the right space for your next meeting, gathering, or camp. Start with a room or choose a time that works for you.</p>
-        </div>
-        <div className="hero-note"><span className="hero-note-icon" aria-hidden="true">↗</span><span>Come together.<br /><strong>Build community.</strong></span><small>Grand River Friendship Society</small></div>
-      </header>
-      <div className="section-intro"><div><span className="eyebrow">SPACE TO CONNECT</span><h2>Find your room</h2></div><p>Choose how you’d like to book.</p></div>
+      <header className="section-intro"><h1>Find your room</h1><p>Choose how you’d like to book.</p></header>
 
       {user && campWarnings.length > 0 && (
         <div className="camp-warning-list" aria-live="polite">
