@@ -539,6 +539,7 @@ const AdminDashboard = () => {
 
   return (
     <div className="admin-dashboard">
+      <header className="page-intro"><span className="eyebrow">COMMUNITY MANAGEMENT</span><h1>Booking overview</h1><p>Manage spaces, review requests, and keep everyone connected.</p></header>
       <div className="admin-dashboard-header">
         
         <div className="calendar-navigation">

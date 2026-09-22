@@ -16,6 +16,7 @@ function App() {
   return (
     <Router>
       <Navbar />
+      <main id="main-content" className="site-main">
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
@@ -44,6 +45,8 @@ function App() {
         />
         <Route path="/dev-edit" element={< BookingPage /> } />
       </Routes>
+      </main>
+      <footer className="site-footer"><span>Grand River Friendship Society</span><span>A place to gather. A space to belong.</span></footer>
     </Router>
   );
 }

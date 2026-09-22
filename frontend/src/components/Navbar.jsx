@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Link, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { getUser, logoutUser } from '../services/api';
 import '../styles/Navbar.css';
 
@@ -31,18 +31,20 @@ const Navbar = () => {
 
   return (
     <nav className="navbar">
+      <a className="skip-link" href="#main-content">Skip to content</a>
       <div className="navbar-container">
         <Link to="/" className="navbar-brand">
           
-          <span className="navbar-brand-text">GRFS Booking</span>
+          <span className="brand-symbol" aria-hidden="true">G<span>+</span></span>
+          <span className="navbar-brand-text">GRFS<span className="brand-caption">Community spaces</span></span>
         </Link>
         <div className="navbar-menu">
           {user ? (
             <>
-              <Link to="/dashboard" className="navbar-link">My Bookings</Link>
-              <Link to="/bookingpage" className="navbar-link">Book Rooms</Link>
+              <NavLink to="/dashboard" className="navbar-link">My Bookings</NavLink>
+              <NavLink to="/bookingpage" className="navbar-link">Book Rooms</NavLink>
               {user && user.role === 'admin' && (
-                <Link to="/admin" className="navbar-link">Admin</Link>
+                <NavLink to="/admin" className="navbar-link">Admin</NavLink>
               )}
               <div className="navbar-user">
                 <span className="navbar-username">{user.first_name} {user.last_name}</span>
@@ -51,8 +53,9 @@ const Navbar = () => {
             </>
           ) : (
             <>
-              <Link to="/login" className="navbar-link">Login</Link>
-              <Link to="/register" className="navbar-link">Register</Link>
+              <NavLink to="/bookingpage" className="navbar-link">Explore spaces</NavLink>
+              <NavLink to="/login" className="navbar-link">Sign in</NavLink>
+              <NavLink to="/register" className="navbar-link nav-signup">Create account</NavLink>
             </>
           )}
         </div>

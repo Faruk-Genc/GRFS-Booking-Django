@@ -327,7 +327,7 @@ const BookingForm = () => {
 
   return (
     <div className="booking-form-container">
-      <h2>Complete Your Booking</h2>
+      <header className="page-intro"><span className="eyebrow">ONE STEP CLOSER</span><h2>Make it a date.</h2><p>Choose your schedule and confirm your room reservation.</p></header>
       
       {roomIds.length === 0 && (
         <div className="error-message">

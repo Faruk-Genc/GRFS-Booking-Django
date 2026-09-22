@@ -301,7 +301,7 @@ const Dashboard = () => {
 
   return (
     <div className="dashboard-container">
-      <h1>My Bookings</h1>
+      <header className="page-intro"><span className="eyebrow">YOUR SCHEDULE</span><h1>My bookings</h1><p>Everything you have planned, all in one place.</p></header>
       
       {error && <div className="error-message">{error}</div>}
 
