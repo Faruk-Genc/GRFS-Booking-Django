@@ -28,6 +28,7 @@ import pytz
 import logging
 import os
 from .permissions import IsApprovedUser
+from .scheduling import weekend_school_conflicts
 
 # Create your views here.
 
@@ -127,7 +128,9 @@ def check_booking_conflicts(room_ids, start_datetime, end_datetime, exclude_book
     if exclude_booking_id:
         conflicting_bookings = conflicting_bookings.exclude(id=exclude_booking_id)
     
-    conflicts = []
+    conflicts = weekend_school_conflicts(
+        Room.objects.filter(id__in=room_ids).select_related('floor'), start_dt, end_dt,
+    )
     for booking in conflicting_bookings:
         # Get the rooms that conflict - use prefetched rooms to avoid N+1 queries
         conflicting_rooms = [room for room in booking.rooms.all() if room.id in room_ids]
@@ -308,6 +311,7 @@ class CreateBookingView(APIView):
                         conflict_details.append(
                             f"Room '{conflict['room_name']}' is already booked from "
                             f"{conflict['existing_start']} to {conflict['existing_end']}"
+                            + (f" for {conflict['reason']}" if conflict.get('reason') else '')
                         )
                         unavailable_hours.append({
                             'room': conflict['room_name'],
@@ -317,7 +321,9 @@ class CreateBookingView(APIView):
                     
                     return Response(
                         {
-                            "detail": "Some rooms are already booked during the requested time.",
+                            "detail": ("Classrooms are reserved for Weekend School every Saturday from 9am to 3pm."
+                                       if any(c.get('reason') == 'Weekend School' for c in conflicts)
+                                       else "Some rooms are already booked during the requested time."),
                             "conflicts": unavailable_hours,
                             "conflict_messages": conflict_details
                         }, 
@@ -1103,6 +1109,21 @@ class CheckAvailabilityView(APIView):
                     })
             
             # Generate available hours (hours that are not in unavailable_slots for all rooms)
+            school_blocks = weekend_school_conflicts(
+                Room.objects.filter(id__in=room_ids).select_related('floor'), start_of_day, end_of_day,
+            )
+            for block in school_blocks:
+                block_start = datetime.fromisoformat(block['existing_start'])
+                block_end = datetime.fromisoformat(block['existing_end'])
+                booking_slots_for_calculation.append({
+                    'room_id': block['room_id'], 'start_est': block_start, 'end_est': block_end,
+                })
+                unavailable_slots.append({
+                    'room_id': block['room_id'], 'room_name': block['room_name'],
+                    'start_hour': 9, 'end_hour': 15, 'reason': 'Weekend School',
+                    'start_time': '09:00 AM', 'end_time': '03:00 PM',
+                    'start_datetime': block['existing_start'], 'end_datetime': block['existing_end'],
+                })
             available_hours = []
             for hour in all_hours:
                 # Check if this hour is available for all requested rooms
@@ -1123,8 +1144,8 @@ class CheckAvailabilityView(APIView):
                     if slot_start_est < hour_end_datetime and slot_end_est > hour_datetime:
                         unavailable_for_rooms.add(slot_room_id)
                 
-                # An hour is available if at least one requested room is not unavailable
-                if len(unavailable_for_rooms) < len(room_ids):
+                # Every selected room must be available for the hour.
+                if not unavailable_for_rooms:
                     available_hours.append(hour)
             if request.user.role == 'admin':
                 all_hours = list(range(24))
@@ -1230,6 +1251,11 @@ class AvailableRoomsView(APIView):
         ).select_related('floor').order_by('floor__name', 'name')
         if request.user.role == 'admin':
             available_rooms = Room.objects.filter(is_active=True).select_related('floor').order_by('floor__name', 'name')
+        else:
+            school_blocks = weekend_school_conflicts(
+                available_rooms, start_datetime, end_datetime,
+            )
+            available_rooms = available_rooms.exclude(id__in=[block['room_id'] for block in school_blocks])
 
         return Response(
             {

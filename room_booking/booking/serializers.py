@@ -5,6 +5,7 @@ from django.db.models import Q
 from django.utils import timezone
 from datetime import timedelta
 from django.contrib.auth.password_validation import validate_password
+from .scheduling import weekend_school_conflicts
 
 User = get_user_model()
 
@@ -291,6 +292,11 @@ class BookingSerializer(serializers.ModelSerializer):
 
             request = self.context.get('request')
             is_admin = bool(request and request.user.role == 'admin')
+            rooms = data.get('rooms', self.instance.rooms.select_related('floor').all() if self.instance else [])
+            if not is_admin and weekend_school_conflicts(rooms, start_datetime, end_datetime):
+                raise serializers.ValidationError({
+                    'detail': 'Classroom 1 and Classroom 2 in Community Hub are reserved for Weekend School every Saturday from 9am to 3pm.'
+                })
             if not is_admin and start_datetime < timezone.now():
                 raise serializers.ValidationError({
                     'start_datetime': 'Cannot create or move bookings into the past.'

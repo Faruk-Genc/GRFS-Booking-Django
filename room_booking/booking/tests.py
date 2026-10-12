@@ -9,6 +9,86 @@ from rest_framework.test import APITestCase
 from .models import Booking, Floor, Room
 
 
+class WeekendSchoolTests(APITestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(username='school-test', email='school@example.com',
+            password='test-password', role='mentor', approval_status='approved')
+        self.client.force_authenticate(self.user)
+        hub = Floor.objects.get(name='Community Hub')
+        self.classrooms = [Room.objects.get(floor=hub, name=f'Classroom {n}') for n in (1, 2)]
+        self.other_room = Room.objects.create(floor=hub, name='Meeting Room')
+        day = timezone.localdate() + timedelta(days=14)
+        self.saturday = day + timedelta(days=(5 - day.weekday()) % 7)
+
+    def create(self, room, start_hour, end_hour, day=None):
+        day = day or self.saturday
+        return self.client.post(reverse('create-booking'), {
+            'room_ids': [room.id], 'start_datetime': f'{day}T{start_hour:02}:00:00',
+            'end_datetime': f'{day}T{end_hour:02}:00:00',
+        }, format='json')
+
+    def test_both_classrooms_blocked_and_boundaries_allowed(self):
+        for room in self.classrooms:
+            for start, end in [(9, 10), (8, 10), (14, 16)]:
+                with self.subTest(room=room.name, start=start):
+                    response = self.create(room, start, end)
+                    self.assertEqual(response.status_code, 409, response.data)
+                    self.assertIn('Weekend School', response.data['detail'])
+            self.assertEqual(self.create(room, 8, 9).status_code, 201)
+            self.assertEqual(self.create(room, 15, 16).status_code, 201)
+
+    def test_other_rooms_and_other_days_remain_bookable(self):
+        self.assertEqual(self.create(self.other_room, 9, 12).status_code, 201)
+        self.assertEqual(self.create(self.classrooms[0], 9, 12, self.saturday + timedelta(days=1)).status_code, 201)
+
+    def test_availability_excludes_school_hours_for_any_selected_classroom(self):
+        response = self.client.get(reverse('check-availability'), {
+            'date': str(self.saturday), 'room_ids': f'{self.classrooms[0].id},{self.other_room.id}',
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(set(range(9, 15)).isdisjoint(response.data['available_hours']))
+        self.assertIn(8, response.data['available_hours'])
+        self.assertIn(15, response.data['available_hours'])
+        response = self.client.get(reverse('available-rooms'), {
+            'date': str(self.saturday), 'start_hour': 9, 'end_hour': 12,
+        })
+        ids = {room['id'] for room in response.data['available_rooms']}
+        self.assertTrue(ids.isdisjoint({room.id for room in self.classrooms}))
+        self.assertIn(self.other_room.id, ids)
+
+    def test_partial_edit_cannot_move_booking_into_school(self):
+        booking = Booking.objects.create(user=self.user,
+            start_datetime=pytz.timezone('America/Toronto').localize(datetime.combine(self.saturday, datetime.min.time().replace(hour=8))),
+            end_datetime=pytz.timezone('America/Toronto').localize(datetime.combine(self.saturday, datetime.min.time().replace(hour=9))),
+            status='Approved')
+        booking.rooms.add(self.classrooms[0])
+        response = self.client.put(reverse('booking-detail', args=[booking.id]), {
+            'end_datetime': f'{self.saturday}T10:00:00',
+        }, format='json')
+        self.assertEqual(response.status_code, 409, response.data)
+
+    def test_multiday_camp_cannot_overlap_school(self):
+        response = self.client.post(reverse('create-booking'), {
+            'room_ids': [self.classrooms[1].id], 'booking_type': 'camp',
+            'start_datetime': f'{self.saturday - timedelta(days=1)}T18:00:00',
+            'end_datetime': f'{self.saturday + timedelta(days=1)}T18:00:00',
+        }, format='json')
+        self.assertEqual(response.status_code, 409, response.data)
+
+    def test_admin_override_is_preserved(self):
+        self.user.role = 'admin'
+        self.user.save()
+        self.assertEqual(self.create(self.classrooms[0], 9, 12).status_code, 201)
+
+    def test_school_uses_toronto_time_in_summer_and_winter(self):
+        from .scheduling import weekend_school_conflicts
+        for day, utc_hour in [('2030-07-06', 13), ('2030-01-05', 14)]:
+            with self.subTest(day=day):
+                start = datetime.fromisoformat(f'{day}T{utc_hour:02}:00:00+00:00')
+                self.assertTrue(weekend_school_conflicts(self.classrooms, start, start + timedelta(hours=1)))
+                self.assertFalse(weekend_school_conflicts(self.classrooms, start - timedelta(hours=1), start))
+
+
 class SiteAccessTests(APITestCase):
     def test_direct_booking_page_requests_redirect_to_sign_in(self):
         from django.test import RequestFactory
