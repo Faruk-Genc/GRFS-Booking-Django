@@ -72,6 +72,7 @@ API.interceptors.response.use(
         await axios.post(`${API_BASE_URL}auth/refresh/`, {}, { withCredentials: true });
         return API(originalRequest);
       } catch (refreshError) {
+        window.dispatchEvent(new Event('auth-session-ended'));
         // Refresh failed. The calling route decides whether to show or navigate
         // to login; forcing a page reload here creates an authentication loop.
         return Promise.reject(refreshError);
@@ -91,7 +92,11 @@ export const loginUser = async (data) => {
   return await API.post('auth/login/', data);
 };
 
-export const logoutUser = async () => API.post('auth/logout/');
+export const logoutUser = async () => {
+  const response = await API.post('auth/logout/');
+  window.dispatchEvent(new Event('auth-session-ended'));
+  return response;
+};
 
 export const getUser = async () => {
   return await API.get('auth/user/');

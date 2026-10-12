@@ -9,6 +9,39 @@ from rest_framework.test import APITestCase
 from .models import Booking, Floor, Room
 
 
+class SiteAccessTests(APITestCase):
+    def test_direct_booking_page_requests_redirect_to_sign_in(self):
+        from django.test import RequestFactory
+        from .views import serve_react_app
+        for path in ['/', '/bookingpage', '/booking-form?rooms=1', '/dashboard', '/dev-edit', '/unknown']:
+            with self.subTest(path=path):
+                response = serve_react_app(RequestFactory().get(path))
+                self.assertEqual(response.status_code, 302)
+                self.assertTrue(response['Location'].startswith('/login?next='))
+
+    def test_account_pages_remain_accessible(self):
+        from unittest.mock import patch
+        from django.test import RequestFactory
+        from django.http import HttpResponse
+        from .views import serve_react_app
+        for path in ['/login', '/register', '/forgot-password', '/reset-password/uid/token']:
+            with self.subTest(path=path), patch('booking.views.render', return_value=HttpResponse('Account page')):
+                self.assertEqual(serve_react_app(RequestFactory().get(path)).status_code, 200)
+
+    def test_valid_refresh_cookie_allows_session_recovery(self):
+        from django.test import RequestFactory
+        from rest_framework_simplejwt.tokens import RefreshToken
+        from .views import has_site_session
+        user = get_user_model().objects.create_user(username='site-access', email='site@example.com',
+            password='test-password', approval_status='approved')
+        request = RequestFactory().get('/bookingpage')
+        request.COOKIES['refresh_token'] = str(RefreshToken.for_user(user))
+        self.assertTrue(has_site_session(request))
+        user.approval_status = 'denied'
+        user.save()
+        self.assertFalse(has_site_session(request))
+
+
 class RoomListViewTests(APITestCase):
     def setUp(self):
         self.user = get_user_model().objects.create_user(

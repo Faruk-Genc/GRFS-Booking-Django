@@ -16,7 +16,11 @@ from datetime import datetime, timedelta
 from django.db.models import Q
 from django.db import IntegrityError, DatabaseError, connection, transaction
 from django.contrib.auth.password_validation import validate_password
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpResponseRedirect
+from urllib.parse import urlencode
+from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.exceptions import TokenError, InvalidToken
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_http_methods
 from django.conf import settings
@@ -31,6 +35,23 @@ logger = logging.getLogger(__name__)
 
 User = get_user_model()
 
+
+def has_site_session(request):
+    authentication = JWTAuthentication()
+    for name in ('access_token', 'refresh_token'):
+        raw_token = request.COOKIES.get(name)
+        if not raw_token:
+            continue
+        try:
+            token = (authentication.get_validated_token(raw_token.encode())
+                     if name == 'access_token' else RefreshToken(raw_token))
+            user = authentication.get_user(token)
+            if user.is_active and user.approval_status == 'approved':
+                return True
+        except (TokenError, InvalidToken, AuthenticationFailed):
+            continue
+    return False
+
 # View to serve React app in production
 @ensure_csrf_cookie
 def serve_react_app(request):
@@ -38,6 +59,11 @@ def serve_react_app(request):
     # Only handle GET and HEAD requests
     if request.method not in ['GET', 'HEAD']:
         return HttpResponse('Method not allowed', status=405)
+
+    public_path = request.path.rstrip('/')
+    is_account_page = public_path in ('/login', '/register', '/forgot-password') or public_path.startswith('/reset-password/')
+    if not is_account_page and not has_site_session(request):
+        return HttpResponseRedirect('/login?' + urlencode({'next': request.get_full_path()}))
     
     try:
         # Use Django's template system to render the template

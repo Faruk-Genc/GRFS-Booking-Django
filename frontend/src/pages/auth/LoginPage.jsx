@@ -31,9 +31,11 @@ const handleSubmit = async (e) => {
     await loginUser(dataToSend);
     
     // Redirect to the page the user came from, or home if no redirect specified
-    const from = location.state?.from || '/';
+    const next = new URLSearchParams(location.search).get('next');
+    const safeNext = next?.startsWith('/') && !next.startsWith('//') && !next.includes('\\') ? next : '/';
+    const from = location.state?.from || safeNext;
     const search = location.state?.search || '';
-    navigate(from + search);
+    navigate(from + search, { replace: true });
   } catch (err) {
     // Only show generic error to user, don't expose internal details
     setError('Invalid credentials. Please try again.');

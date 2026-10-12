@@ -383,47 +383,6 @@ const BookingForm = () => {
             <div className="loading-message">Loading availability...</div>
           )}
 
-          {/* Available Hours Display - only for regular bookings */}
-          {!isCampBooking && !loading && selectedDate && availableHours.length > 0 && (
-            <div className="availability-info">
-              <h3>
-                Available Hours for{' '}
-                {new Date(`${selectedDate}T12:00:00`).toLocaleDateString()}
-              </h3>
-              <div className="available-hours">
-                {availableHours.map(hour => (
-                  <span key={hour} className="hour-badge available">
-                    {formatHour(hour)}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Unavailable Slots Display - only for regular bookings */}
-          {!isCampBooking && !loading && selectedDate && unavailableSlots.length > 0 && (
-            <div className="unavailable-info">
-              <h4>Unavailable Time Slots:</h4>
-              <ul>
-                {[...unavailableSlots]
-                  .sort((a, b) => {
-                    // Sort by start_hour if available, otherwise by start_datetime
-                    if (a.start_hour !== undefined && b.start_hour !== undefined) {
-                      return a.start_hour - b.start_hour;
-                    }
-                    // Fallback to datetime string comparison
-                    const aTime = a.start_datetime || a.start_time || '';
-                    const bTime = b.start_datetime || b.start_time || '';
-                    return aTime.localeCompare(bTime);
-                  })
-                  .map((slot, idx) => (
-                    <li key={idx}>
-                      <strong>{slot.room_name}</strong>: {formatTimeString(slot.start_time)} - {formatTimeString(slot.end_time)}
-                    </li>
-                  ))}
-              </ul>
-            </div>
-          )}
 
           {/* No Availability Message - only for regular bookings */}
           {!isCampBooking && !loading && selectedDate && availableHours.length === 0 && unavailableSlots.length > 0 && (
