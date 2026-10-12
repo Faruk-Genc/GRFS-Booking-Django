@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { getUser } from '../services/api';
 
 const PrivateRoute = ({ children }) => {
+  const location = useLocation();
   const [isAuthenticated, setIsAuthenticated] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -32,7 +33,7 @@ const PrivateRoute = ({ children }) => {
     return <div>Loading...</div>; // Or a loading spinner component
   }
 
-  return isAuthenticated ? children : <Navigate to="/login" />;
+  return isAuthenticated ? children : <Navigate to="/login" replace state={{ from: location.pathname, search: location.search }} />;
 };
 
 export default PrivateRoute;

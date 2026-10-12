@@ -40,15 +40,16 @@ const BookingForm = () => {
   const [error, setError] = useState(null);
   const [conflictDetails, setConflictDetails] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const [user, setUser] = useState(null);
+  const isAdmin = user?.role === 'admin';
+  const supportsMultiDay = isCampBooking || isAdmin;
+
+  useEffect(() => {
+    getUser().then(response => setUser(response.data)).catch(() => {});
+  }, []);
 
   // Get today's date in YYYY-MM-DD format for min date
   const today = getLocalDateValue();
-  const venueToday = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/Toronto', year: 'numeric', month: '2-digit', day: '2-digit',
-  }).format(new Date());
-  const campMinimum = new Date(`${venueToday}T12:00:00Z`);
-  campMinimum.setUTCDate(campMinimum.getUTCDate() + 5);
-  const earliestCampDate = campMinimum.toISOString().slice(0, 10);
 
   // Memoize fetchAvailability to prevent recreating on every render
   const fetchAvailability = useCallback(async () => {
@@ -59,7 +60,7 @@ const BookingForm = () => {
     try {
       const response = await checkAvailability(selectedDate, roomIds);
       setAvailableHours(response.data.available_hours || []);
-      setUnavailableSlots(response.data.unavailable_slots || []);
+      setUnavailableSlots(isAdmin ? [] : response.data.unavailable_slots || []);
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to fetch availability');
       setAvailableHours([]);
@@ -67,7 +68,7 @@ const BookingForm = () => {
     } finally {
       setLoading(false);
     }
-  }, [selectedDate, roomIds]);
+  }, [selectedDate, roomIds, isAdmin]);
 
   // Fetch availability when date is selected (only for regular bookings)
   useEffect(() => {
@@ -124,7 +125,7 @@ const BookingForm = () => {
 
   const handleDateChange = (e) => {
     setSelectedDate(e.target.value);
-    if (isCampBooking) {
+    if (supportsMultiDay) {
       // For camp bookings, set end date to same as start date initially
       setSelectedEndDate(e.target.value);
     }
@@ -164,12 +165,7 @@ const BookingForm = () => {
       return;
     }
     
-    if (isCampBooking) {
-      // Camp booking validation
-      if (selectedDate && selectedDate < earliestCampDate) {
-        setError(`Camp bookings require at least 5 calendar days notice. Earliest start date: ${earliestCampDate}.`);
-        return;
-      }
+    if (supportsMultiDay) {
       if (!selectedDate || !selectedEndDate || !startTime || !endTime) {
         setError('Please select start date, end date, start time, and end time');
         return;
@@ -213,7 +209,7 @@ const BookingForm = () => {
       let endHour = parseInt(endTime);
       
       const startDate = selectedDate;
-      const endDate = isCampBooking ? selectedEndDate : selectedDate;
+      const endDate = supportsMultiDay ? selectedEndDate : selectedDate;
       let endMinute = 0;
       
       // Treat the midnight option as the final minute of the selected day.
@@ -348,26 +344,26 @@ const BookingForm = () => {
               marginBottom: '20px',
               border: '2px solid #1a3970'
             }}>
-              <strong>Camp Booking:</strong> This booking will require admin approval. Choose a start date at least 5 calendar days from today.
+              <strong>Camp Booking:</strong> {isAdmin ? 'Your booking will be approved automatically.' : 'This booking will require admin approval.'} Choose your start and end dates.
             </div>
           )}
           
           {/* Date Selection */}
           <div className="form-group">
-            <label htmlFor="date">{isCampBooking ? 'Start Date *' : 'Select Date *'}</label>
+            <label htmlFor="date">{supportsMultiDay ? 'Start Date *' : 'Select Date *'}</label>
             <input
               type="date"
               id="date"
               value={selectedDate}
               onChange={handleDateChange}
-              min={isCampBooking ? earliestCampDate : today}
+              min={isAdmin ? undefined : today}
               required
               className="form-input date-input"
             />
           </div>
 
           {/* End Date Selection for Camp Bookings */}
-          {isCampBooking && (
+          {supportsMultiDay && (
             <div className="form-group">
               <label htmlFor="endDate">End Date *</label>
               <input
@@ -440,7 +436,7 @@ const BookingForm = () => {
           {selectedDate && (isCampBooking || availableHours.length > 0) && (
             <div className="form-group">
               <label htmlFor="startTime">Start Time *</label>
-              {isCampBooking ? (
+              {supportsMultiDay ? (
                 <select
                   id="startTime"
                   value={startTime}
@@ -478,7 +474,7 @@ const BookingForm = () => {
           {startTime && (isCampBooking || true) && (
             <div className="form-group">
               <label htmlFor="endTime">End Time *</label>
-              {isCampBooking ? (
+              {supportsMultiDay ? (
                 <select
                   id="endTime"
                   value={endTime}
@@ -487,7 +483,7 @@ const BookingForm = () => {
                   className="form-input"
                 >
                   <option value="">Select end time</option>
-                  {Array.from({ length: 24 }, (_, i) => i + 1).map(hour => (
+                  {Array.from({ length: 25 }, (_, i) => i).map(hour => (
                     <option key={hour} value={hour}>
                       {formatHour(hour)}
                     </option>
@@ -581,7 +577,7 @@ const BookingForm = () => {
             </button>
             <button
               type="submit"
-              disabled={submitting || !selectedDate || !startTime || !endTime || (isCampBooking && !selectedEndDate)}
+              disabled={submitting || !selectedDate || !startTime || !endTime || (supportsMultiDay && !selectedEndDate)}
               className="btn-primary"
             >
               {submitting ? 'Creating Booking...' : isCampBooking ? 'Submit Camp Booking' : 'Complete Booking'}

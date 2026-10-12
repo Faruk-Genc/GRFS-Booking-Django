@@ -245,6 +245,7 @@ const AdminDashboard = () => {
     
     setEditForm({
       selectedDate: startDate,
+      selectedEndDate: selectedBooking.end_datetime ? new Date(selectedBooking.end_datetime).toISOString().split('T')[0] : startDate,
       startTime: startHour,
       endTime: endHour,
       room_ids: roomIds,
@@ -283,7 +284,7 @@ const AdminDashboard = () => {
   };
 
   const getEndTimeOptions = (startHour, unavailableSlots, roomIds) => {
-    if (!startHour) return [];
+    if (startHour === '' || startHour === null || Number.isNaN(startHour)) return [];
     
     const startHourInt = parseInt(startHour);
     const options = [];
@@ -315,7 +316,8 @@ const AdminDashboard = () => {
       return;
     }
 
-    if (parseInt(editForm.startTime) >= parseInt(editForm.endTime)) {
+    if ((editForm.selectedEndDate || editForm.selectedDate) < editForm.selectedDate ||
+        ((editForm.selectedEndDate || editForm.selectedDate) === editForm.selectedDate && parseInt(editForm.startTime) >= parseInt(editForm.endTime))) {
       alert('End time must be after start time');
       return;
     }
@@ -324,7 +326,7 @@ const AdminDashboard = () => {
       const startHour = parseInt(editForm.startTime);
       let endHour = parseInt(editForm.endTime);
       
-      const endDate = editForm.selectedDate;
+      const endDate = editForm.selectedEndDate || editForm.selectedDate;
       let endMinute = 0;
       if (endHour === 24) {
         endHour = 23;
@@ -743,12 +745,16 @@ const AdminDashboard = () => {
                       onChange={handleEditDateChange}
                       onKeyDown={handleDateKeyDown}
                       onKeyPress={(e) => e.preventDefault()}
-                      min={new Date().toISOString().split('T')[0]}
-                      max={new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0]}
                       required
                       className="form-input date-input"
                       onClick={handleDateInputClick}
                     />
+                  </div>
+                  <div className="edit-form-group">
+                    <label htmlFor="editEndDate">End Date:</label>
+                    <input type="date" id="editEndDate" value={editForm.selectedEndDate || editForm.selectedDate}
+                      min={editForm.selectedDate} onChange={e => setEditForm({...editForm, selectedEndDate: e.target.value})}
+                      required className="form-input date-input" />
                   </div>
                   {editLoading && <div className="loading-message">Loading availability...</div>}
                   {editForm.selectedDate && editAvailableHours.length > 0 && (
@@ -781,7 +787,9 @@ const AdminDashboard = () => {
                         className="form-input"
                       >
                         <option value="">Select end time</option>
-                        {getEndTimeOptions(parseInt(editForm.startTime), editUnavailableSlots, editForm.room_ids).map(opt => (
+                        {((editForm.selectedEndDate || editForm.selectedDate) > editForm.selectedDate
+                          ? Array.from({length: 25}, (_, hour) => ({value: hour}))
+                          : getEndTimeOptions(parseInt(editForm.startTime), editUnavailableSlots, editForm.room_ids)).map(opt => (
                           <option key={opt.value} value={opt.value}>
                             {formatHour(opt.value)}
                           </option>

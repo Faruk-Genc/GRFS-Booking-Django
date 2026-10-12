@@ -248,10 +248,11 @@ const BookingPage = () => {
     navigate(`/booking-form?${params.toString()}`);
   };
 
-  const timeStartOptions = Array.from({ length: 16 }, (_, index) => index + 8);
+  const isAdmin = user?.role === 'admin';
+  const timeStartOptions = Array.from({ length: isAdmin ? 24 : 16 }, (_, index) => index + (isAdmin ? 0 : 8));
   const timeEndOptions = timeStart
     ? Array.from(
-        { length: Math.min(24, parseInt(timeStart) + 8) - parseInt(timeStart) },
+        { length: (isAdmin ? 24 : Math.min(24, parseInt(timeStart) + 8)) - parseInt(timeStart) },
         (_, index) => parseInt(timeStart) + index + 1,
       )
     : [];
@@ -433,7 +434,7 @@ const BookingPage = () => {
               <input
                 id="timeBookingDate"
                 type="date"
-                min={today}
+                min={isAdmin ? undefined : today}
                 value={timeDate}
                 onChange={handleTimeDateChange}
                 required

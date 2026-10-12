@@ -244,14 +244,14 @@ class CreateBookingView(APIView):
             
             # Validate that start_datetime is not in the past
             now = timezone.now()
-            if start_datetime < now:
+            if request.user.role != 'admin' and start_datetime < now:
                 return Response(
                     {"detail": "Cannot create bookings in the past."}, 
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
             # For camp bookings, skip duration validation (they can span multiple days)
-            if booking_type != 'camp':
+            if booking_type != 'camp' and request.user.role != 'admin':
                 # Validate maximum booking duration (e.g., 8 hours) for regular bookings
                 max_duration = timedelta(hours=8)
                 if (end_datetime - start_datetime) > max_duration:
@@ -274,7 +274,7 @@ class CreateBookingView(APIView):
                 lock_booking_rooms(room_ids)
                 # Check for conflicts (works for both regular and camp bookings)
                 conflicts = check_booking_conflicts(room_ids, start_datetime, end_datetime)
-                if conflicts:
+                if conflicts and request.user.role != 'admin':
                     # Format conflict details for user-friendly error message
                     conflict_details = []
                     unavailable_hours = []
@@ -336,7 +336,7 @@ class CreateBookingView(APIView):
             )
     
 class FloorListView(APIView):
-    permission_classes = [permissions.AllowAny]  # Anyone can view floors
+    permission_classes = [IsApprovedUser]
 
     def get(self, request):
         try:
@@ -358,7 +358,7 @@ class FloorListView(APIView):
             )
 
 class RoomListView(APIView):
-    permission_classes = [permissions.AllowAny]  # Anyone can view rooms
+    permission_classes = [IsApprovedUser]
 
     def get(self, request):
         try:
@@ -494,7 +494,7 @@ class BookingDetailView(APIView):
                 )
             
             # Don't allow editing cancelled bookings
-            if booking.status == 'Cancelled':
+            if booking.status == 'Cancelled' and request.user.role != 'admin':
                 return Response(
                     {"detail": "Cannot edit a cancelled booking."}, 
                     status=status.HTTP_400_BAD_REQUEST
@@ -559,7 +559,7 @@ class BookingDetailView(APIView):
             with transaction.atomic():
                 lock_booking_rooms(room_ids)
                 conflicts = check_booking_conflicts(room_ids, start_dt, end_dt, exclude_booking_id=booking_id)
-                if conflicts:
+                if conflicts and request.user.role != 'admin':
                     return Response(
                         {"detail": "The updated booking conflicts with existing bookings.", "conflicts": conflicts}, 
                         status=status.HTTP_409_CONFLICT
@@ -960,7 +960,7 @@ class CheckAvailabilityView(APIView):
     Check availability of rooms for a specific date.
     Returns available time slots for the given rooms on the specified date.
     """
-    permission_classes = [permissions.AllowAny]  # Allow anyone to check availability
+    permission_classes = [IsApprovedUser]
     
     def get(self, request):
         try:
@@ -1100,6 +1100,10 @@ class CheckAvailabilityView(APIView):
                 # An hour is available if at least one requested room is not unavailable
                 if len(unavailable_for_rooms) < len(room_ids):
                     available_hours.append(hour)
+            if request.user.role == 'admin':
+                all_hours = list(range(24))
+                available_hours = all_hours
+                unavailable_slots = []
             
             return Response({
                 'date': date_str,
@@ -1127,7 +1131,7 @@ class CheckAvailabilityView(APIView):
 class AvailableRoomsView(APIView):
     """Return active rooms that are free for an entire requested interval."""
 
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [IsApprovedUser]
 
     def get(self, request):
         date_str = request.GET.get('date')
@@ -1150,7 +1154,8 @@ class AvailableRoomsView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        if start_hour < 8 or start_hour > 23 or end_hour < 9 or end_hour > 24:
+        minimum_hour = 0 if request.user.role == 'admin' else 8
+        if start_hour < minimum_hour or start_hour > 23 or end_hour <= minimum_hour or end_hour > 24:
             return Response(
                 {"detail": "Hours must be between 8:00 AM and 11:59 PM."},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -1162,7 +1167,7 @@ class AvailableRoomsView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        if end_hour - start_hour > 8:
+        if request.user.role != 'admin' and end_hour - start_hour > 8:
             return Response(
                 {"detail": "Booking duration cannot exceed 8 hours."},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -1181,7 +1186,7 @@ class AvailableRoomsView(APIView):
                 datetime.combine(check_date, datetime.min.time().replace(hour=end_hour)),
             )
 
-        if start_datetime < timezone.now():
+        if request.user.role != 'admin' and start_datetime < timezone.now():
             return Response(
                 {"detail": "Cannot search for booking times in the past."},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -1197,6 +1202,8 @@ class AvailableRoomsView(APIView):
         available_rooms = Room.objects.filter(is_active=True).exclude(
             id__in=unavailable_room_ids,
         ).select_related('floor').order_by('floor__name', 'name')
+        if request.user.role == 'admin':
+            available_rooms = Room.objects.filter(is_active=True).select_related('floor').order_by('floor__name', 'name')
 
         return Response(
             {

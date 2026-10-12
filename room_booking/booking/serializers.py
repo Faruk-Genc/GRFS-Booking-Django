@@ -289,7 +289,9 @@ class BookingSerializer(serializers.ModelSerializer):
                     'end_datetime': 'End datetime must be after start datetime.'
                 })
 
-            if start_datetime < timezone.now():
+            request = self.context.get('request')
+            is_admin = bool(request and request.user.role == 'admin')
+            if not is_admin and start_datetime < timezone.now():
                 raise serializers.ValidationError({
                     'start_datetime': 'Cannot create or move bookings into the past.'
                 })
@@ -298,24 +300,14 @@ class BookingSerializer(serializers.ModelSerializer):
                 'booking_type',
                 self.instance.booking_type if self.instance else 'regular',
             )
-            if booking_type != 'camp':
+            if booking_type != 'camp' and not is_admin:
                 duration = end_datetime - start_datetime
                 if duration < timedelta(hours=1) or duration > timedelta(hours=8):
                     raise serializers.ValidationError({
                         'end_datetime': 'Regular bookings must be between 1 and 8 hours.'
                     })
 
-            request = self.context.get('request')
-            if booking_type == 'camp' and (
-                not self.instance or start_datetime != self.instance.start_datetime
-                or self.instance.booking_type != 'camp'
-            ):
-                earliest = timezone.localdate() + timedelta(days=5)
-                if timezone.localdate(start_datetime) < earliest:
-                    raise serializers.ValidationError({
-                        'detail': f'Camp bookings require at least 5 calendar days notice. Earliest start date: {earliest.isoformat()}.'
-                    })
-            if booking_type != 'camp' and request:
+            if booking_type != 'camp' and request and not is_admin:
                 owner = self.instance.user if self.instance else request.user
                 # Both creation and editing validate inside a transaction. Lock
                 # the owner so simultaneous requests in different rooms serialize.

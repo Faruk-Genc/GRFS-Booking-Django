@@ -28,6 +28,7 @@ class RoomListViewTests(APITestCase):
             name="Room 2",
             is_active=False,
         )
+        self.client.force_authenticate(self.user)
 
     def test_room_list_excludes_inactive_rooms(self):
         response = self.client.get(reverse("room-list"))
@@ -153,6 +154,8 @@ class CampBookingWarningTests(APITestCase):
 
 class AvailableRoomsViewTests(APITestCase):
     def setUp(self):
+        # Keep this fixture independent of rooms seeded by data migrations.
+        Room.objects.all().delete()
         self.user = get_user_model().objects.create_user(
             username="availability-tester",
             email="availability-tester@example.com",
@@ -186,6 +189,7 @@ class AvailableRoomsViewTests(APITestCase):
             status="Approved",
         )
         self.booking.rooms.add(self.booked_room)
+        self.client.force_authenticate(self.user)
 
     def find_rooms(self, start_hour, end_hour):
         return self.client.get(
@@ -223,14 +227,14 @@ class AvailableRoomsViewTests(APITestCase):
 
 
 class BookingSecurityTests(APITestCase):
-    def test_camp_notice_uses_calendar_days_not_elapsed_hours(self):
+    def test_camp_can_be_booked_without_five_day_notice(self):
         from unittest.mock import patch
         self.user.role = 'mentor'
         self.user.save()
         est = pytz.timezone('America/New_York')
         now = est.localize(datetime(2030, 1, 10, 23, 30))
         with patch('django.utils.timezone.now', return_value=now):
-            for day, expected in [(14, 400), (15, 201)]:
+            for day, expected in [(11, 201), (14, 201), (15, 201)]:
                 with self.subTest(day=day):
                     start = est.localize(datetime(2030, 1, day, 1))
                     response = self.client.post(reverse('create-booking'), {
@@ -239,6 +243,51 @@ class BookingSecurityTests(APITestCase):
                         'end_datetime': (start + timedelta(days=1)).isoformat(),
                     }, format='json')
                     self.assertEqual(response.status_code, expected, response.data)
+
+    def test_room_and_availability_endpoints_require_login(self):
+        self.client.force_authenticate(user=None)
+        for name in ['floor-list', 'room-list', 'check-availability', 'available-rooms', 'camp-booking-warnings']:
+            with self.subTest(endpoint=name):
+                self.assertEqual(self.client.get(reverse(name)).status_code, 401)
+
+    def test_admin_can_create_past_short_long_overlapping_and_consecutive_bookings(self):
+        self.user.role = 'admin'
+        self.user.save()
+        start = timezone.now().replace(microsecond=0) - timedelta(days=2)
+        for offset, duration in [(0, 10), (0, 0.5), (10, 10)]:
+            with self.subTest(offset=offset, duration=duration):
+                response = self.client.post(reverse('create-booking'), {
+                    'room_ids': [self.room.id],
+                    'start_datetime': (start + timedelta(hours=offset)).isoformat(),
+                    'end_datetime': (start + timedelta(hours=offset + duration)).isoformat(),
+                }, format='json')
+                self.assertEqual(response.status_code, 201, response.data)
+                self.assertEqual(response.data['status'], 'Approved')
+
+    def test_admin_edit_bypasses_user_limits(self):
+        start = timezone.now() + timedelta(days=2)
+        booking = Booking.objects.create(user=self.other_user, start_datetime=start,
+            end_datetime=start + timedelta(hours=2), status='Approved')
+        booking.rooms.add(self.room)
+        self.user.role = 'admin'
+        self.user.save()
+        past = timezone.now() - timedelta(days=2)
+        response = self.client.put(reverse('booking-detail', args=[booking.id]), {
+            'start_datetime': past.isoformat(), 'end_datetime': (past + timedelta(hours=12)).isoformat(),
+        }, format='json')
+        self.assertEqual(response.status_code, 200, response.data)
+
+    def test_classroom_migration_is_idempotent(self):
+        import importlib
+        from django.apps import apps
+        from django.db import connection
+        migration = importlib.import_module('booking.migrations.0012_community_hub_classrooms')
+        from types import SimpleNamespace
+        editor = SimpleNamespace(connection=connection)
+        migration.add_classrooms(apps, editor)
+        migration.add_classrooms(apps, editor)
+        hub = Floor.objects.get(name='Community Hub')
+        self.assertEqual(set(hub.rooms.values_list('name', flat=True)), {'Classroom 1', 'Classroom 2'})
 
     def setUp(self):
         User = get_user_model()

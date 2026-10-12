@@ -53,7 +53,6 @@ const Navbar = () => {
             </>
           ) : (
             <>
-              <NavLink to="/bookingpage" className="navbar-link">Explore spaces</NavLink>
               <NavLink to="/login" className="navbar-link">Sign in</NavLink>
               <NavLink to="/register" className="navbar-link nav-signup">Create account</NavLink>
             </>
